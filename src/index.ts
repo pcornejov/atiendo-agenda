@@ -115,12 +115,26 @@ export default {
         // en una tarea en background — el volumen esperado (pocos pilotos,
         // un mensaje a la vez) hace esto rápido de sobra dentro del timeout
         // de ack de WhatsApp.
-        await procesarMensajeEntrante({
-          db: env.DB,
-          claude: new Anthropic({ apiKey: env.ANTHROPIC_API_KEY }),
-          whatsappToken: env.WHATSAPP_TOKEN,
-          mensaje,
-        });
+        //
+        // Se atrapa cualquier error acá (Claude, D1, o el envío por
+        // WhatsApp) y se responde 200 igual: si devolviéramos 500, WhatsApp
+        // reintenta el mismo mensaje más tarde, y como el estado de la
+        // conversación puede haber cambiado a mitad de camino (ej. ya se
+        // guardó conversaciones_estado pero falló el envío), un reintento
+        // automático podría interpretar el mismo mensaje del cliente dos
+        // veces con contexto distinto. Es preferible que, ante una falla
+        // puntual, el cliente simplemente no reciba respuesta esa vez (y
+        // pueda volver a escribir) a arriesgar un doble procesamiento.
+        try {
+          await procesarMensajeEntrante({
+            db: env.DB,
+            claude: new Anthropic({ apiKey: env.ANTHROPIC_API_KEY }),
+            whatsappToken: env.WHATSAPP_TOKEN,
+            mensaje,
+          });
+        } catch (error) {
+          console.error(`Error procesando mensaje de ${mensaje.clienteTelefono}:`, error);
+        }
       }
       // Si no hay mensaje de texto (status update, otro tipo de mensaje,
       // payload inesperado) no hay nada que procesar, pero igual se
