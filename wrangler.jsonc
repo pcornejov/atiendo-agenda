@@ -25,6 +25,14 @@
     "crons": ["*/5 * * * *"]
   },
 
+  // Nombre e idioma de la plantilla de WhatsApp aprobada por Meta que usa el
+  // cron de recordatorios (no son secretos, van acá; ver README para el
+  // texto sugerido de la plantilla y cómo aprobarla).
+  "vars": {
+    "WHATSAPP_TEMPLATE_RECORDATORIO_NOMBRE": "recordatorio_cita",
+    "WHATSAPP_TEMPLATE_RECORDATORIO_IDIOMA": "es"
+  },
+
   "observability": {
     "enabled": true
   }

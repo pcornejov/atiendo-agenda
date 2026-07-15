@@ -31,8 +31,12 @@ dueño del negocio (ver [`seed.sql`](./seed.sql)) — sin panel self-service tod
 5. Responde por WhatsApp (`src/lib/whatsapp.ts`) con el texto correspondiente
    (`src/lib/mensajes.ts`).
 
-Lo que falta (próxima sesión): el cron de recordatorios todavía es un stub — falta
-la query real + el envío del mensaje de plantilla (fuera de la ventana de 24h).
+El cron de recordatorios (`src/lib/recordatorios.ts`, corre cada 5 min) ya hace lo
+mismo del lado de las citas: busca las que empiezan entre 55-65 min desde ahora sin
+`recordatorio_enviado`, y les manda una plantilla de WhatsApp. **Falta que crees y
+apruebes esa plantilla en Meta** — ver la sección "Plantilla de WhatsApp para el
+recordatorio" más abajo, es lo único que queda pendiente de tu lado para tener el
+MVP completo.
 
 ## Prerequisitos
 
@@ -158,6 +162,34 @@ npx wrangler d1 execute atiendo-agenda-db --local --command="SELECT * FROM citas
 Con un `WHATSAPP_TOKEN` real (y un número de prueba de Meta agregado como receptor)
 ya se puede probar la conversación de punta a punta, incluyendo la respuesta que
 llega al teléfono.
+
+## Plantilla de WhatsApp para el recordatorio (pendiente de tu lado)
+
+WhatsApp solo deja escribirle primero al cliente (sin que él haya escrito en las
+últimas 24h) usando una **plantilla de mensaje pre-aprobada por Meta** — es el caso
+del recordatorio, que se manda 1h antes sin que el cliente haya escrito nada. Un
+mensaje de texto normal (como los de la conversación de agendamiento) no sirve para
+esto y Meta lo rechaza.
+
+Pasos para habilitarlo:
+
+1. En [Meta Business Manager](https://business.facebook.com) → WhatsApp Manager →
+   Message Templates, creá una plantilla nueva, categoría **Utility**, con un body
+   como:
+
+   > Te recordamos tu cita de {{1}} hoy a las {{2}}. ¡Te esperamos!
+
+   (`{{1}}` = nombre del servicio, `{{2}}` = hora — en ese orden, es lo que manda
+   `procesarRecordatorios` en `src/lib/recordatorios.ts`.)
+2. Metá la envía a revisión; la aprobación suele tardar minutos a un par de horas.
+3. Una vez aprobada, anotá el **nombre exacto** y el **código de idioma** con que
+   quedó (ej. `recordatorio_cita` / `es`) y actualizalos en `wrangler.jsonc` →
+   `vars.WHATSAPP_TEMPLATE_RECORDATORIO_NOMBRE` / `_IDIOMA` (y en `.dev.vars` si
+   querés probarlo en local con esos mismos valores).
+
+Sin esto, el cron sigue corriendo cada 5 min sin problema (y reintenta
+automáticamente lo que falle), pero cada intento de envío va a fallar con un error
+de Meta hasta que la plantilla exista y esté aprobada.
 
 ## Schema
 

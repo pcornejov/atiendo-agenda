@@ -4,6 +4,7 @@ import { interpretarSolicitud } from "./lib/nlu.ts";
 import { utcToZoned, diaSemanaDeFecha, nombreDiaSemana } from "./lib/tz.ts";
 import { parsearMensajeWhatsApp } from "./lib/webhook.ts";
 import { procesarMensajeEntrante } from "./lib/flujo.ts";
+import { procesarRecordatorios } from "./lib/recordatorios.ts";
 
 export interface Env {
   DB: D1Database;
@@ -14,6 +15,12 @@ export interface Env {
   WHATSAPP_TOKEN: string;
   WHATSAPP_VERIFY_TOKEN: string;
   ANTHROPIC_API_KEY: string;
+  // Plantilla de WhatsApp aprobada por Meta para el recordatorio (mensaje
+  // proactivo, fuera de la ventana de 24h — no puede ser un mensaje de
+  // servicio normal). Nombre e idioma exactos tal como quedaron aprobados
+  // en el Meta Business Manager. Ver README.
+  WHATSAPP_TEMPLATE_RECORDATORIO_NOMBRE: string;
+  WHATSAPP_TEMPLATE_RECORDATORIO_IDIOMA: string;
 }
 
 export default {
@@ -124,12 +131,15 @@ export default {
     return new Response("Not found", { status: 404 });
   },
 
-  async scheduled(event: ScheduledController, _env: Env, _ctx: ExecutionContext): Promise<void> {
-    // TODO(próxima sesión): consultar `citas` con estado != 'cancelada' AND
-    // recordatorio_enviado = 0 AND fecha_hora_inicio entre ahora y
-    // ahora+70min, enviar un mensaje de plantilla de WhatsApp (proactivo,
-    // fuera de la ventana de 24h así que requiere plantilla pre-aprobada)
-    // por cada una, y marcar recordatorio_enviado = 1.
-    console.log(`Cron disparado a las ${new Date(event.scheduledTime).toISOString()}`);
+  async scheduled(event: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
+    const resultado = await procesarRecordatorios({
+      db: env.DB,
+      whatsappToken: env.WHATSAPP_TOKEN,
+      nombrePlantilla: env.WHATSAPP_TEMPLATE_RECORDATORIO_NOMBRE,
+      idiomaPlantilla: env.WHATSAPP_TEMPLATE_RECORDATORIO_IDIOMA,
+    });
+    console.log(
+      `Cron de recordatorios (${new Date(event.scheduledTime).toISOString()}): ${resultado.enviados} enviados, ${resultado.fallidos} fallidos`
+    );
   },
 } satisfies ExportedHandler<Env>;

@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { enviarMensajeWhatsApp } from "./whatsapp.ts";
+import { enviarMensajeWhatsApp, enviarPlantillaWhatsApp } from "./whatsapp.ts";
 
 test("enviarMensajeWhatsApp arma la URL, headers y body correctos", async () => {
   const llamadas: Array<{ url: string; init: RequestInit }> = [];
@@ -40,4 +40,67 @@ test("enviarMensajeWhatsApp lanza un error legible si la API responde con error"
     ),
     /401/
   );
+});
+
+test("enviarPlantillaWhatsApp arma el body de tipo template con los parámetros en orden", async () => {
+  const llamadas: Array<{ url: string; init: RequestInit }> = [];
+  const fetchFalso: typeof fetch = async (url, init) => {
+    llamadas.push({ url: url.toString(), init: init ?? {} });
+    return new Response("{}", { status: 200 });
+  };
+
+  await enviarPlantillaWhatsApp(
+    {
+      phoneNumberId: "123456789012345",
+      token: "tok-abc",
+      para: "+56912345678",
+      nombrePlantilla: "recordatorio_cita",
+      idioma: "es",
+      parametros: ["Corte de pelo", "10:00"],
+    },
+    fetchFalso
+  );
+
+  assert.equal(llamadas[0].url, "https://graph.facebook.com/v21.0/123456789012345/messages");
+  assert.deepEqual(JSON.parse(llamadas[0].init.body as string), {
+    messaging_product: "whatsapp",
+    to: "+56912345678",
+    type: "template",
+    template: {
+      name: "recordatorio_cita",
+      language: { code: "es" },
+      components: [
+        {
+          type: "body",
+          parameters: [
+            { type: "text", text: "Corte de pelo" },
+            { type: "text", text: "10:00" },
+          ],
+        },
+      ],
+    },
+  });
+});
+
+test("enviarPlantillaWhatsApp sin parámetros omite el bloque de components", async () => {
+  const llamadas: Array<{ init: RequestInit }> = [];
+  const fetchFalso: typeof fetch = async (_url, init) => {
+    llamadas.push({ init: init ?? {} });
+    return new Response("{}", { status: 200 });
+  };
+
+  await enviarPlantillaWhatsApp(
+    {
+      phoneNumberId: "1",
+      token: "tok",
+      para: "+56900000000",
+      nombrePlantilla: "sin_parametros",
+      idioma: "es",
+      parametros: [],
+    },
+    fetchFalso
+  );
+
+  const body = JSON.parse(llamadas[0].init.body as string);
+  assert.equal("components" in body.template, false);
 });
