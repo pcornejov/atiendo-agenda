@@ -8,10 +8,12 @@ manicurista, etc.).
 hora el jueves en la tarde?"), el bot interpreta la solicitud, ofrece horarios
 disponibles, agenda, confirma, y manda un recordatorio 1h antes de la cita. El
 cliente puede cancelar escribiendo "cancelar". No incluye multi-servicio,
-multi-profesional, pagos ni panel de administración — eso es Fase 2/3.
+multi-profesional, pagos ni autogestión por parte del dueño del negocio — eso
+es Fase 2/3.
 
-Estrategia: 3-5 pilotos gratis, cargados **a mano** en la base de datos por el
-dueño del negocio (ver [`seed.sql`](./seed.sql)) — sin panel self-service todavía.
+Estrategia: 3-5 pilotos gratis, cargados por el administrador a través del
+[panel de administración](./admin/) (`admin/`, ver su propio README) — sin
+self-service todavía.
 
 ## Estado actual
 
@@ -25,6 +27,13 @@ de punta a punta (probado con un negocio de demo). Pendiente:
   de demostración; para un piloto real hay que completar además la verificación de
   negocio en Meta (el número de prueba solo puede hablar con hasta 5 destinatarios
   verificados manualmente).
+- **Proteger el panel de administración con Cloudflare Access** — el
+  [panel](./admin/) ya está desplegado en producción pero, hasta configurar Access
+  en el dashboard de Cloudflare (paso a paso en `admin/README.md`), queda accesible
+  públicamente. Lo mismo aplica a `GET /interno/disponibilidad` y
+  `POST /interno/interpretar` de este Worker.
+- **Renovar el token de WhatsApp antes de que expire** (~60 días desde su último
+  intercambio) — no hay recordatorio automático configurado todavía.
 
 ## Cómo funciona el flujo conversacional
 
@@ -110,9 +119,13 @@ dashboard de Meta (WhatsApp > Configuration), usando el mismo `WHATSAPP_VERIFY_T
 
 ## Dar de alta un nuevo piloto
 
-Sin panel de administración en Fase 1: copiar y editar [`seed.sql`](./seed.sql) con
-los datos del negocio (nombre, teléfono, `whatsapp_phone_number_id`, servicio,
-duración, horarios) y correrlo con:
+Con el [panel de administración](./admin/): crear el negocio, cargar sus horarios
+y ver/cancelar sus citas sin tocar SQL a mano. Requiere configurar Cloudflare
+Access antes de dejarlo accesible en producción (ver `admin/README.md`).
+
+También se puede seguir dando de alta a mano copiando y editando
+[`seed.sql`](./seed.sql) con los datos del negocio (nombre, teléfono,
+`whatsapp_phone_number_id`, servicio, duración, horarios) y corriéndolo con:
 
 ```bash
 npx wrangler d1 execute atiendo-agenda-db --remote --file=./seed.sql
@@ -129,8 +142,10 @@ npm run test
 
 ## Verificar disponibilidad de un piloto
 
-Mientras no hay panel de administración, `GET /interno/disponibilidad` sirve para
-chequear a mano los próximos horarios libres de un negocio recién cargado:
+Además del panel de administración, `GET /interno/disponibilidad` sirve para
+chequear a mano los próximos horarios libres de un negocio recién cargado. **Esta
+ruta no tiene autenticación en producción** — pendiente de sumarla a la misma
+aplicación de Cloudflare Access que protege el panel (ver `admin/README.md`):
 
 ```bash
 curl "http://localhost:8787/interno/disponibilidad?negocio_id=1&limite=5"
