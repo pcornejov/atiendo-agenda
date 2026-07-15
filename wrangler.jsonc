@@ -1,0 +1,31 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "atiendo-agenda",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-01-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Binding D1. `database_id` se completa después de correr:
+  //   npx wrangler d1 create atiendo-agenda-db
+  // El dev local (`wrangler dev`) usa un SQLite local automáticamente, no
+  // necesita este database_id. Solo se usa para la DB remota (producción).
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "atiendo-agenda-db",
+      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  // Cron trigger para el job de recordatorios (1h antes de cada cita).
+  // Cada 5 min: toda cita se detecta entre 55-65 min antes de empezar
+  // (ver query en src/index.ts `scheduled` y el README).
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  },
+
+  "observability": {
+    "enabled": true
+  }
+}
