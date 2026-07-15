@@ -57,6 +57,14 @@ export function formatearSinCitaParaCancelar(): string {
   return "No encontré ninguna cita activa a tu nombre para cancelar.";
 }
 
+export function formatearMiCita(cita: { inicioLocal: string }, servicioNombre: string): string {
+  return `Tienes agendado ${servicioNombre} para el ${formatearFechaLegible(cita.inicioLocal)}.`;
+}
+
+export function formatearSinCitaParaConsultar(): string {
+  return "No encontré ninguna cita activa a tu nombre. ¿Quieres que te muestre horarios disponibles?";
+}
+
 export function formatearFallback(servicioNombre: string): string {
   return `¡Hola! Soy el asistente de agendamiento para ${servicioNombre}. Escríbeme qué día y horario te gustaría, o "cancelar" si quieres cancelar una cita.`;
 }

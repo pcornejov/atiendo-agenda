@@ -7,7 +7,7 @@
 import { obtenerSlotsDisponibles, type SlotDisponible } from "./disponibilidad.ts";
 import { interpretarSolicitud, interpretarSeleccion, type ClienteClaude } from "./nlu.ts";
 import { obtenerEstadoVigente, guardarEstado, limpiarEstado } from "./conversacion.ts";
-import { crearCita, cancelarCitaActiva } from "./reserva.ts";
+import { crearCita, cancelarCitaActiva, buscarCitaActiva } from "./reserva.ts";
 import { enviarMensajeWhatsApp } from "./whatsapp.ts";
 import { utcToZoned, diaSemanaDeFecha, nombreDiaSemana } from "./tz.ts";
 import {
@@ -18,6 +18,8 @@ import {
   formatearSlotYaNoDisponible,
   formatearCancelacionExitosa,
   formatearSinCitaParaCancelar,
+  formatearMiCita,
+  formatearSinCitaParaConsultar,
   formatearFallback,
 } from "./mensajes.ts";
 import type { MensajeEntrante } from "./webhook.ts";
@@ -90,6 +92,22 @@ export async function procesarMensajeEntrante(params: {
 
   if (solicitud.intent === "cancelar") {
     await manejarCancelacion(db, negocio, mensaje, ahoraUtc, enviar);
+    return;
+  }
+
+  if (solicitud.intent === "consultar_mi_cita") {
+    const resultado = await buscarCitaActiva(
+      db,
+      negocio.id,
+      mensaje.clienteTelefono,
+      ahoraUtc,
+      negocio.timezone
+    );
+    if (resultado.ok) {
+      await enviar(formatearMiCita(resultado.cita, negocio.servicio_nombre));
+    } else {
+      await enviar(formatearSinCitaParaConsultar());
+    }
     return;
   }
 

@@ -24,7 +24,7 @@ export interface ClienteClaude {
 
 export const MODELO_HAIKU = "claude-haiku-4-5-20251001";
 
-export type Intent = "consultar_disponibilidad" | "cancelar" | "otro";
+export type Intent = "consultar_disponibilidad" | "consultar_mi_cita" | "cancelar" | "otro";
 export type RangoHorarioPreferido = "manana" | "tarde" | "noche";
 
 export interface SolicitudInterpretada {
@@ -42,9 +42,9 @@ const TOOL_INTERPRETAR_SOLICITUD: Anthropic.Tool = {
     properties: {
       intent: {
         type: "string",
-        enum: ["consultar_disponibilidad", "cancelar", "otro"],
+        enum: ["consultar_disponibilidad", "consultar_mi_cita", "cancelar", "otro"],
         description:
-          "'consultar_disponibilidad' si el cliente pide hora o pregunta por disponibilidad. 'cancelar' si pide cancelar una cita existente. 'otro' para saludos, agradecimientos, o cualquier cosa que no encaje en las anteriores.",
+          "'consultar_disponibilidad' si el cliente pide hora o pregunta por horarios libres para agendar. 'consultar_mi_cita' si pregunta por una cita que ya tiene agendada (ej. 'a qué hora es mi cita', 'cuándo agendé', 'qué día tengo hora'). 'cancelar' si pide cancelar una cita existente. 'otro' para saludos, agradecimientos, o cualquier cosa que no encaje en las anteriores.",
       },
       fecha_preferida: {
         type: ["string", "null"],
@@ -81,7 +81,12 @@ function esFechaValida(valor: unknown): valor is string {
   return typeof valor === "string" && /^\d{4}-\d{2}-\d{2}$/.test(valor);
 }
 
-const INTENTS_SOLICITUD: readonly Intent[] = ["consultar_disponibilidad", "cancelar", "otro"];
+const INTENTS_SOLICITUD: readonly Intent[] = [
+  "consultar_disponibilidad",
+  "consultar_mi_cita",
+  "cancelar",
+  "otro",
+];
 const RANGOS_VALIDOS: readonly RangoHorarioPreferido[] = ["manana", "tarde", "noche"];
 
 /** Interpreta un mensaje nuevo del cliente (sin conversación pendiente). */

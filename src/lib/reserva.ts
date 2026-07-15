@@ -41,6 +41,34 @@ export async function crearCita(
   return { ok: true };
 }
 
+export type ResultadoBuscarCita =
+  | { ok: true; cita: { inicioLocal: string } }
+  | { ok: false };
+
+/** Busca (sin modificar) la próxima cita activa (futura, pendiente o confirmada) de un cliente en un negocio. */
+export async function buscarCitaActiva(
+  db: D1Database,
+  negocioId: number,
+  clienteTelefono: string,
+  ahoraUtc: Date,
+  timezone: string
+): Promise<ResultadoBuscarCita> {
+  const cita = await db
+    .prepare(
+      `SELECT fecha_hora_inicio FROM citas
+       WHERE negocio_id = ? AND cliente_telefono = ?
+         AND estado IN ('pendiente', 'confirmada') AND fecha_hora_inicio > ?
+       ORDER BY fecha_hora_inicio ASC
+       LIMIT 1`
+    )
+    .bind(negocioId, clienteTelefono, ahoraUtc.toISOString())
+    .first<{ fecha_hora_inicio: string }>();
+  if (!cita) return { ok: false };
+
+  const { fechaYMD, horaHHMM } = utcToZoned(new Date(cita.fecha_hora_inicio), timezone);
+  return { ok: true, cita: { inicioLocal: `${fechaYMD} ${horaHHMM}` } };
+}
+
 export type ResultadoCancelarCita =
   | { ok: true; citaCancelada: { inicioLocal: string } }
   | { ok: false };

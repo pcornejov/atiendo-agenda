@@ -48,6 +48,19 @@ test("interpretarSolicitud: mapea una respuesta válida de Claude", async () => 
   });
 });
 
+test("interpretarSolicitud: reconoce 'consultar_mi_cita' (preguntar por una cita ya agendada)", async () => {
+  const client = clienteFalso({
+    intent: "consultar_mi_cita",
+    fecha_preferida: null,
+    rango_horario_preferido: null,
+  });
+  const resultado = await interpretarSolicitud(client, {
+    ...PARAMS_BASE,
+    mensajeCliente: "a que hora tengo mi cita?",
+  });
+  assert.equal(resultado.intent, "consultar_mi_cita");
+});
+
 test("interpretarSolicitud: intent inválido cae a 'otro'", async () => {
   const client = clienteFalso({
     intent: "algo_que_no_existe",

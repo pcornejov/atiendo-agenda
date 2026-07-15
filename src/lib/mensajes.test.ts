@@ -5,6 +5,8 @@ import {
   formatearOfertaHorarios,
   formatearConfirmacion,
   formatearCancelacionExitosa,
+  formatearMiCita,
+  formatearSinCitaParaConsultar,
 } from "./mensajes.ts";
 import type { SlotDisponible } from "./disponibilidad.ts";
 
@@ -29,4 +31,14 @@ test("formatearConfirmacion incluye el día en español y la hora local", () => 
 test("formatearCancelacionExitosa incluye la fecha legible de la cita cancelada", () => {
   const texto = formatearCancelacionExitosa({ inicioLocal: "2026-07-16 10:00" });
   assert.match(texto, /jueves 16\/07 10:00/);
+});
+
+test("formatearMiCita incluye el servicio y la fecha legible de la cita", () => {
+  const texto = formatearMiCita({ inicioLocal: "2026-07-16 10:00" }, "Corte de pelo");
+  assert.match(texto, /jueves 16\/07 10:00/);
+  assert.match(texto, /Corte de pelo/);
+});
+
+test("formatearSinCitaParaConsultar no lanza y devuelve texto no vacío", () => {
+  assert.ok(formatearSinCitaParaConsultar().length > 0);
 });
