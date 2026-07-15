@@ -1,3 +1,5 @@
+import { obtenerSlotsDisponibles } from "./lib/disponibilidad.ts";
+
 export interface Env {
   DB: D1Database;
   // Secrets: `wrangler secret put <NOMBRE>` en prod, `.dev.vars` en local.
@@ -10,6 +12,24 @@ export interface Env {
 export default {
   async fetch(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+
+    if (request.method === "GET" && url.pathname === "/interno/disponibilidad") {
+      // Herramienta manual de verificación mientras no hay panel de admin:
+      // permite chequear los slots libres de un piloto recién cargado sin
+      // esperar a un mensaje real de WhatsApp.
+      //   GET /interno/disponibilidad?negocio_id=1&limite=3&dias=14
+      const negocioId = Number(url.searchParams.get("negocio_id"));
+      if (!negocioId) {
+        return new Response("Falta negocio_id", { status: 400 });
+      }
+      const limite = Number(url.searchParams.get("limite") ?? "3");
+      const dias = Number(url.searchParams.get("dias") ?? "14");
+      const slots = await obtenerSlotsDisponibles(env.DB, negocioId, {
+        limite,
+        diasHaciaAdelante: dias,
+      });
+      return Response.json({ negocio_id: negocioId, slots });
+    }
 
     if (request.method === "GET" && url.pathname === "/webhook") {
       // Handshake de verificación del webhook de WhatsApp Cloud API (Meta lo

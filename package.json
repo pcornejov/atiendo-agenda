@@ -2,6 +2,7 @@
   "name": "atiendo-agenda",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
@@ -11,10 +12,12 @@
     "db:migrations:apply:remote": "wrangler d1 migrations apply atiendo-agenda-db --remote",
     "db:seed:local": "wrangler d1 execute atiendo-agenda-db --local --file=./seed.sql",
     "db:seed:remote": "wrangler d1 execute atiendo-agenda-db --remote --file=./seed.sql",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test src/lib/*.test.ts"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250101.0",
+    "@types/node": "^22.10.0",
     "typescript": "^5.7.0",
     "wrangler": "^3.99.0"
   },
