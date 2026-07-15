@@ -13,6 +13,19 @@ multi-profesional, pagos ni panel de administración — eso es Fase 2/3.
 Estrategia: 3-5 pilotos gratis, cargados **a mano** en la base de datos por el
 dueño del negocio (ver [`seed.sql`](./seed.sql)) — sin panel self-service todavía.
 
+## Estado actual
+
+El bot ya está desplegado en producción y respondiendo mensajes reales de WhatsApp
+de punta a punta (probado con un negocio de demo). Pendiente:
+
+- **Aprobación de la plantilla de recordatorio** por parte de Meta — ver la sección
+  correspondiente más abajo. Sin esto el cron corre igual, pero el envío del
+  recordatorio falla.
+- **Dar de alta el/los primeros pilotos reales** — el negocio actualmente cargado es
+  de demostración; para un piloto real hay que completar además la verificación de
+  negocio en Meta (el número de prueba solo puede hablar con hasta 5 destinatarios
+  verificados manualmente).
+
 ## Cómo funciona el flujo conversacional
 
 `POST /webhook` ya es el flujo completo (`src/lib/flujo.ts`):
@@ -174,18 +187,19 @@ esto y Meta lo rechaza.
 Pasos para habilitarlo:
 
 1. En [Meta Business Manager](https://business.facebook.com) → WhatsApp Manager →
-   Message Templates, creá una plantilla nueva, categoría **Utility**, con un body
+   Message Templates, crea una plantilla nueva, categoría **Utility**, con un body
    como:
 
    > Te recordamos tu cita de {{1}} hoy a las {{2}}. ¡Te esperamos!
 
    (`{{1}}` = nombre del servicio, `{{2}}` = hora — en ese orden, es lo que manda
    `procesarRecordatorios` en `src/lib/recordatorios.ts`.)
-2. Metá la envía a revisión; la aprobación suele tardar minutos a un par de horas.
-3. Una vez aprobada, anotá el **nombre exacto** y el **código de idioma** con que
-   quedó (ej. `recordatorio_cita` / `es`) y actualizalos en `wrangler.jsonc` →
-   `vars.WHATSAPP_TEMPLATE_RECORDATORIO_NOMBRE` / `_IDIOMA` (y en `.dev.vars` si
-   querés probarlo en local con esos mismos valores).
+2. Envíala a revisión; la aprobación suele tardar minutos a un par de horas.
+3. Una vez aprobada, anota el **nombre exacto** y el **código de idioma** con que
+   quedó (Meta puede modificar el nombre que pusiste, ej. agregando un guion bajo)
+   y actualízalos en `wrangler.jsonc` → `vars.WHATSAPP_TEMPLATE_RECORDATORIO_NOMBRE`
+   / `_IDIOMA` (y en `.dev.vars` si quieres probarlo en local con esos mismos
+   valores).
 
 Sin esto, el cron sigue corriendo cada 5 min sin problema (y reintenta
 automáticamente lo que falle), pero cada intento de envío va a fallar con un error
