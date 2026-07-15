@@ -23,22 +23,22 @@ export function formatearOfertaHorarios(slots: SlotDisponible[], servicioNombre:
     `Tengo estos horarios disponibles para ${servicioNombre}:`,
     ...lineas,
     "",
-    "Respondé con el número de la opción que prefieras.",
+    "Responde con el número de la opción que prefieras.",
   ].join("\n");
 }
 
 export function formatearRepetirOpciones(slots: SlotDisponible[], servicioNombre: string): string {
   const lineas = slots.map((s, i) => `${i + 1}) ${formatearFechaLegible(s.inicioLocal)}`);
   return [
-    "No entendí cuál preferís. Estas son las opciones de nuevo:",
+    "No entendí cuál prefieres. Estas son las opciones de nuevo:",
     ...lineas,
     "",
-    "Respondé con el número de la opción, o escribí \"cancelar\" si ya no la necesitás.",
+    "Responde con el número de la opción, o escribe \"cancelar\" si ya no la necesitas.",
   ].join("\n");
 }
 
 export function formatearSinHorarios(): string {
-  return "Por ahora no tengo horarios disponibles en esas fechas. ¿Querés que busque otro día?";
+  return "Por ahora no tengo horarios disponibles en esas fechas. ¿Quieres que busque otro día?";
 }
 
 export function formatearConfirmacion(slot: SlotDisponible, servicioNombre: string): string {
@@ -46,7 +46,7 @@ export function formatearConfirmacion(slot: SlotDisponible, servicioNombre: stri
 }
 
 export function formatearSlotYaNoDisponible(): string {
-  return "Uy, justo se acaba de ocupar ese horario. ¿Querés que te muestre otras opciones?";
+  return "Uy, justo se acaba de ocupar ese horario. ¿Quieres que te muestre otras opciones?";
 }
 
 export function formatearCancelacionExitosa(slot: { inicioLocal: string }): string {
@@ -58,5 +58,5 @@ export function formatearSinCitaParaCancelar(): string {
 }
 
 export function formatearFallback(servicioNombre: string): string {
-  return `¡Hola! Soy el asistente de agendamiento para ${servicioNombre}. Escribime qué día y horario te gustaría, o "cancelar" si querés cancelar una cita.`;
+  return `¡Hola! Soy el asistente de agendamiento para ${servicioNombre}. Escríbeme qué día y horario te gustaría, o "cancelar" si quieres cancelar una cita.`;
 }
