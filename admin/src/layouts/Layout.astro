@@ -1,0 +1,89 @@
+---
+interface Props {
+  title: string;
+}
+const { title } = Astro.props;
+---
+
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title} — Atiendo Agenda Admin</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: system-ui, sans-serif;
+      }
+      body {
+        max-width: 860px;
+        margin: 0 auto;
+        padding: 1.5rem;
+        line-height: 1.5;
+      }
+      nav {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid #8888;
+      }
+      nav a {
+        text-decoration: none;
+        font-weight: 600;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 1rem 0;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 0.4rem 0.6rem;
+        border-bottom: 1px solid #8884;
+      }
+      form.inline {
+        display: inline;
+      }
+      .form-grid {
+        display: grid;
+        gap: 0.75rem;
+        max-width: 480px;
+      }
+      .form-grid label {
+        display: grid;
+        gap: 0.25rem;
+        font-weight: 600;
+      }
+      input,
+      select {
+        padding: 0.4rem;
+        font-size: 1rem;
+      }
+      button {
+        padding: 0.5rem 1rem;
+        font-size: 1rem;
+        cursor: pointer;
+      }
+      .error {
+        background: #fee;
+        color: #900;
+        padding: 0.75rem;
+        border-radius: 4px;
+        margin-bottom: 1rem;
+      }
+      .badge-inactivo {
+        color: #900;
+        font-size: 0.85em;
+      }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <a href="/negocios">Negocios</a>
+    </nav>
+    <h1>{title}</h1>
+    <slot />
+  </body>
+</html>

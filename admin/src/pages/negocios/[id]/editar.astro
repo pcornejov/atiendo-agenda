@@ -1,0 +1,50 @@
+---
+import { env } from "cloudflare:workers";
+import Layout from "../../../layouts/Layout.astro";
+import NegocioForm from "../../../components/NegocioForm.astro";
+import { obtenerNegocio, actualizarNegocio } from "../../../lib/db.ts";
+import { validarNegocioForm, type NegocioFormValores } from "../../../lib/validacion.ts";
+
+const negocioId = Number(Astro.params.id);
+const negocioExistente = await obtenerNegocio(env.DB, negocioId);
+if (!negocioExistente) {
+  return new Response("Negocio no encontrado", { status: 404 });
+}
+
+let errores: string[] = [];
+let valores: NegocioFormValores = {
+  nombre: negocioExistente.nombre,
+  telefono_whatsapp: negocioExistente.telefono_whatsapp,
+  whatsapp_phone_number_id: negocioExistente.whatsapp_phone_number_id,
+  servicio_nombre: negocioExistente.servicio_nombre,
+  duracion_minutos: String(negocioExistente.duracion_minutos),
+  timezone: negocioExistente.timezone,
+};
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  valores = {
+    nombre: String(form.get("nombre") ?? ""),
+    telefono_whatsapp: String(form.get("telefono_whatsapp") ?? ""),
+    whatsapp_phone_number_id: String(form.get("whatsapp_phone_number_id") ?? ""),
+    servicio_nombre: String(form.get("servicio_nombre") ?? ""),
+    duracion_minutos: String(form.get("duracion_minutos") ?? ""),
+    timezone: String(form.get("timezone") ?? ""),
+  };
+
+  const validacion = validarNegocioForm(valores);
+  if (validacion.ok) {
+    const resultado = await actualizarNegocio(env.DB, negocioId, validacion.datos);
+    if (resultado.ok) {
+      return Astro.redirect("/negocios");
+    }
+    errores = [resultado.error];
+  } else {
+    errores = validacion.errores;
+  }
+}
+---
+
+<Layout title={`Editar — ${negocioExistente.nombre}`}>
+  <NegocioForm valores={valores} errores={errores} textoBoton="Guardar cambios" />
+</Layout>

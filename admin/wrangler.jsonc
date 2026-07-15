@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "atiendo-agenda-admin",
+  "compatibility_date": "2025-01-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Misma base D1 que el Worker del bot (pcornejov/atiendo-agenda), bindeada
+  // acá también — este proyecto es un panel admin separado que lee/escribe
+  // la misma base, no importa código del bot.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "atiendo-agenda-db",
+      "database_id": "837af49b-9d1c-4e1d-81f5-6bd26fde96de",
+      "migrations_dir": "../migrations"
+    }
+  ]
+}

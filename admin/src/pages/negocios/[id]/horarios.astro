@@ -1,0 +1,102 @@
+---
+import { env } from "cloudflare:workers";
+import Layout from "../../../layouts/Layout.astro";
+import { obtenerNegocio, listarHorarios, crearHorario, eliminarHorario } from "../../../lib/db.ts";
+import { esRangoHorarioValido } from "../../../lib/validacion.ts";
+import { nombreDiaSemana } from "../../../lib/tz.ts";
+
+const negocioId = Number(Astro.params.id);
+const negocio = await obtenerNegocio(env.DB, negocioId);
+if (!negocio) {
+  return new Response("Negocio no encontrado", { status: 404 });
+}
+
+let error: string | null = null;
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  const accion = String(form.get("_accion") ?? "crear");
+
+  if (accion === "eliminar") {
+    const horarioId = Number(form.get("horario_id"));
+    if (horarioId) await eliminarHorario(env.DB, negocioId, horarioId);
+  } else {
+    const diaSemana = Number(form.get("dia_semana"));
+    const horaInicio = String(form.get("hora_inicio") ?? "");
+    const horaFin = String(form.get("hora_fin") ?? "");
+
+    if (Number.isInteger(diaSemana) && diaSemana >= 0 && diaSemana <= 6 && esRangoHorarioValido(horaInicio, horaFin)) {
+      await crearHorario(env.DB, negocioId, diaSemana, horaInicio, horaFin);
+    } else {
+      error = "El horario no es válido — la hora de fin debe ser posterior a la de inicio.";
+    }
+  }
+
+  if (!error) return Astro.redirect(`/negocios/${negocioId}/horarios`);
+}
+
+const horarios = await listarHorarios(env.DB, negocioId);
+---
+
+<Layout title={`Horarios — ${negocio.nombre}`}>
+  <p><a href="/negocios">&larr; Volver a negocios</a></p>
+
+  {error && <div class="error">{error}</div>}
+
+  {horarios.length === 0 && <p>Todavía no hay horarios cargados para este negocio.</p>}
+
+  {horarios.length > 0 && (
+    <table>
+      <thead>
+        <tr>
+          <th>Día</th>
+          <th>Desde</th>
+          <th>Hasta</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {horarios.map((h) => (
+          <tr>
+            <td>{nombreDiaSemana(h.dia_semana)}</td>
+            <td>{h.hora_inicio}</td>
+            <td>{h.hora_fin}</td>
+            <td>
+              <form class="inline" method="POST">
+                <input type="hidden" name="_accion" value="eliminar" />
+                <input type="hidden" name="horario_id" value={h.id} />
+                <button type="submit">Eliminar</button>
+              </form>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )}
+
+  <h2>Agregar horario</h2>
+  <form method="POST" class="form-grid">
+    <input type="hidden" name="_accion" value="crear" />
+    <label>
+      Día de la semana
+      <select name="dia_semana" required>
+        <option value="0">Domingo</option>
+        <option value="1">Lunes</option>
+        <option value="2">Martes</option>
+        <option value="3">Miércoles</option>
+        <option value="4">Jueves</option>
+        <option value="5">Viernes</option>
+        <option value="6">Sábado</option>
+      </select>
+    </label>
+    <label>
+      Hora de inicio (HH:MM)
+      <input type="time" name="hora_inicio" required />
+    </label>
+    <label>
+      Hora de fin (HH:MM)
+      <input type="time" name="hora_fin" required />
+    </label>
+    <button type="submit">Agregar</button>
+  </form>
+</Layout>

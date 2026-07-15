@@ -1,0 +1,57 @@
+---
+import { env } from "cloudflare:workers";
+import Layout from "../../../layouts/Layout.astro";
+import { obtenerNegocio, listarCitasProximas, cancelarCitaPorId } from "../../../lib/db.ts";
+import { utcToZonedTexto } from "../../../lib/tz.ts";
+
+const negocioId = Number(Astro.params.id);
+const negocio = await obtenerNegocio(env.DB, negocioId);
+if (!negocio) {
+  return new Response("Negocio no encontrado", { status: 404 });
+}
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  const citaId = Number(form.get("cita_id"));
+  if (citaId) await cancelarCitaPorId(env.DB, negocioId, citaId);
+  return Astro.redirect(`/negocios/${negocioId}/citas`);
+}
+
+const citas = await listarCitasProximas(env.DB, negocioId);
+---
+
+<Layout title={`Citas — ${negocio.nombre}`}>
+  <p><a href="/negocios">&larr; Volver a negocios</a></p>
+
+  {citas.length === 0 && <p>No hay citas próximas para este negocio.</p>}
+
+  {citas.length > 0 && (
+    <table>
+      <thead>
+        <tr>
+          <th>Fecha y hora</th>
+          <th>Cliente</th>
+          <th>Teléfono</th>
+          <th>Estado</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {citas.map((c) => (
+          <tr>
+            <td>{utcToZonedTexto(c.fecha_hora_inicio, negocio.timezone)}</td>
+            <td>{c.cliente_nombre ?? "—"}</td>
+            <td>{c.cliente_telefono}</td>
+            <td>{c.estado}</td>
+            <td>
+              <form class="inline" method="POST">
+                <input type="hidden" name="cita_id" value={c.id} />
+                <button type="submit">Cancelar</button>
+              </form>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )}
+</Layout>

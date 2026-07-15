@@ -1,0 +1,48 @@
+---
+import type { NegocioFormValores } from "../lib/validacion.ts";
+
+interface Props {
+  valores: NegocioFormValores;
+  errores: string[];
+  textoBoton: string;
+}
+const { valores, errores, textoBoton } = Astro.props;
+---
+
+{errores.length > 0 && (
+  <div class="error">
+    <ul>
+      {errores.map((e) => (
+        <li>{e}</li>
+      ))}
+    </ul>
+  </div>
+)}
+
+<form method="POST" class="form-grid">
+  <label>
+    Nombre del negocio
+    <input type="text" name="nombre" value={valores.nombre} required />
+  </label>
+  <label>
+    Servicio
+    <input type="text" name="servicio_nombre" value={valores.servicio_nombre} required />
+  </label>
+  <label>
+    Duración del servicio (minutos)
+    <input type="number" name="duracion_minutos" value={valores.duracion_minutos} min="1" required />
+  </label>
+  <label>
+    Teléfono de WhatsApp (E.164, ej. +56912345678)
+    <input type="text" name="telefono_whatsapp" value={valores.telefono_whatsapp} required />
+  </label>
+  <label>
+    Phone Number ID de WhatsApp (Meta App &gt; WhatsApp &gt; API Setup)
+    <input type="text" name="whatsapp_phone_number_id" value={valores.whatsapp_phone_number_id} required />
+  </label>
+  <label>
+    Zona horaria (IANA, ej. America/Santiago)
+    <input type="text" name="timezone" value={valores.timezone} required />
+  </label>
+  <button type="submit">{textoBoton}</button>
+</form>

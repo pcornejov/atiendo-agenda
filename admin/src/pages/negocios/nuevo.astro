@@ -1,0 +1,44 @@
+---
+import { env } from "cloudflare:workers";
+import Layout from "../../layouts/Layout.astro";
+import NegocioForm from "../../components/NegocioForm.astro";
+import { crearNegocio } from "../../lib/db.ts";
+import { validarNegocioForm, type NegocioFormValores } from "../../lib/validacion.ts";
+
+let errores: string[] = [];
+let valores: NegocioFormValores = {
+  nombre: "",
+  telefono_whatsapp: "",
+  whatsapp_phone_number_id: "",
+  servicio_nombre: "",
+  duracion_minutos: "45",
+  timezone: "America/Santiago",
+};
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  valores = {
+    nombre: String(form.get("nombre") ?? ""),
+    telefono_whatsapp: String(form.get("telefono_whatsapp") ?? ""),
+    whatsapp_phone_number_id: String(form.get("whatsapp_phone_number_id") ?? ""),
+    servicio_nombre: String(form.get("servicio_nombre") ?? ""),
+    duracion_minutos: String(form.get("duracion_minutos") ?? ""),
+    timezone: String(form.get("timezone") ?? ""),
+  };
+
+  const validacion = validarNegocioForm(valores);
+  if (validacion.ok) {
+    const resultado = await crearNegocio(env.DB, validacion.datos);
+    if (resultado.ok) {
+      return Astro.redirect(`/negocios/${resultado.id}/horarios`);
+    }
+    errores = [resultado.error];
+  } else {
+    errores = validacion.errores;
+  }
+}
+---
+
+<Layout title="Nuevo negocio">
+  <NegocioForm valores={valores} errores={errores} textoBoton="Crear negocio" />
+</Layout>

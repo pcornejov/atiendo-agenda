@@ -1,0 +1,58 @@
+---
+import { env } from "cloudflare:workers";
+import Layout from "../../layouts/Layout.astro";
+import { listarNegocios, cambiarActivo } from "../../lib/db.ts";
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  const negocioId = Number(form.get("negocio_id"));
+  const activo = form.get("activo") === "1";
+  if (negocioId) {
+    await cambiarActivo(env.DB, negocioId, activo);
+  }
+  return Astro.redirect("/negocios");
+}
+
+const negocios = await listarNegocios(env.DB);
+---
+
+<Layout title="Negocios">
+  <p><a href="/negocios/nuevo">+ Nuevo negocio</a></p>
+
+  {negocios.length === 0 && <p>Todavía no hay negocios cargados.</p>}
+
+  {negocios.length > 0 && (
+    <table>
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th>Servicio</th>
+          <th>Teléfono</th>
+          <th>Estado</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {negocios.map((n) => (
+          <tr>
+            <td><a href={`/negocios/${n.id}/editar`}>{n.nombre}</a></td>
+            <td>{n.servicio_nombre} ({n.duracion_minutos} min)</td>
+            <td>{n.telefono_whatsapp}</td>
+            <td>{n.activo ? "Activo" : <span class="badge-inactivo">Inactivo</span>}</td>
+            <td>
+              <a href={`/negocios/${n.id}/horarios`}>Horarios</a>
+              {" · "}
+              <a href={`/negocios/${n.id}/citas`}>Citas</a>
+              {" · "}
+              <form class="inline" method="POST">
+                <input type="hidden" name="negocio_id" value={n.id} />
+                <input type="hidden" name="activo" value={n.activo ? "0" : "1"} />
+                <button type="submit">{n.activo ? "Desactivar" : "Activar"}</button>
+              </form>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )}
+</Layout>
