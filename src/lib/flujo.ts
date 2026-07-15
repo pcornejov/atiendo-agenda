@@ -68,7 +68,15 @@ export async function procesarMensajeEntrante(params: {
   const estadoVigente = await obtenerEstadoVigente(db, negocio.id, mensaje.clienteTelefono, ahoraUtc);
 
   if (estadoVigente?.estado === "esperando_seleccion_horario") {
-    await manejarSeleccion(db, claude, negocio, mensaje, estadoVigente.contexto as ContextoSeleccion, enviar);
+    await manejarSeleccion(
+      db,
+      claude,
+      negocio,
+      mensaje,
+      estadoVigente.contexto as ContextoSeleccion,
+      ahoraUtc,
+      enviar
+    );
     return;
   }
 
@@ -119,6 +127,7 @@ async function manejarSeleccion(
   negocio: NegocioRow,
   mensaje: MensajeEntrante,
   contexto: ContextoSeleccion,
+  ahoraUtc: Date,
   enviar: (texto: string) => Promise<void>
 ): Promise<void> {
   const slotsOfrecidos = contexto.slots;
@@ -129,7 +138,7 @@ async function manejarSeleccion(
 
   if (seleccion.intent === "cancelar") {
     await limpiarEstado(db, negocio.id, mensaje.clienteTelefono);
-    await manejarCancelacion(db, negocio, mensaje, new Date(), enviar);
+    await manejarCancelacion(db, negocio, mensaje, ahoraUtc, enviar);
     return;
   }
 
