@@ -102,8 +102,8 @@ test("interpretarSolicitud: si no hay bloque tool_use, cae a 'otro' sin lanzar",
 
 const HORARIOS_OFRECIDOS = ["2026-07-16 10:00", "2026-07-16 10:45", "2026-07-16 11:30"];
 
-test("interpretarSeleccion: mapea un índice válido", async () => {
-  const client = clienteFalso({ intent: "seleccion", indice_seleccionado: 1 });
+test("interpretarSeleccion: numero_elegido=2 (1-based) mapea a indiceSeleccionado=1 (0-based)", async () => {
+  const client = clienteFalso({ intent: "seleccion", numero_elegido: 2 });
   const resultado = await interpretarSeleccion(client, {
     mensajeCliente: "el de las 10:45",
     horariosOfrecidos: HORARIOS_OFRECIDOS,
@@ -111,8 +111,17 @@ test("interpretarSeleccion: mapea un índice válido", async () => {
   assert.deepEqual(resultado, { intent: "seleccion", indiceSeleccionado: 1 });
 });
 
-test("interpretarSeleccion: índice fuera de rango se descarta", async () => {
-  const client = clienteFalso({ intent: "seleccion", indice_seleccionado: 99 });
+test("interpretarSeleccion: numero_elegido=1 mapea al primero (indiceSeleccionado=0)", async () => {
+  const client = clienteFalso({ intent: "seleccion", numero_elegido: 1 });
+  const resultado = await interpretarSeleccion(client, {
+    mensajeCliente: "el primero",
+    horariosOfrecidos: HORARIOS_OFRECIDOS,
+  });
+  assert.deepEqual(resultado, { intent: "seleccion", indiceSeleccionado: 0 });
+});
+
+test("interpretarSeleccion: numero_elegido fuera de rango se descarta", async () => {
+  const client = clienteFalso({ intent: "seleccion", numero_elegido: 99 });
   const resultado = await interpretarSeleccion(client, {
     mensajeCliente: "el último",
     horariosOfrecidos: HORARIOS_OFRECIDOS,
@@ -120,8 +129,17 @@ test("interpretarSeleccion: índice fuera de rango se descarta", async () => {
   assert.deepEqual(resultado, { intent: "seleccion", indiceSeleccionado: null });
 });
 
-test("interpretarSeleccion: intent 'cancelar' ignora cualquier índice", async () => {
-  const client = clienteFalso({ intent: "cancelar", indice_seleccionado: 0 });
+test("interpretarSeleccion: numero_elegido=0 (fuera de rango, no es 1-based válido) se descarta", async () => {
+  const client = clienteFalso({ intent: "seleccion", numero_elegido: 0 });
+  const resultado = await interpretarSeleccion(client, {
+    mensajeCliente: "el cero",
+    horariosOfrecidos: HORARIOS_OFRECIDOS,
+  });
+  assert.deepEqual(resultado, { intent: "seleccion", indiceSeleccionado: null });
+});
+
+test("interpretarSeleccion: intent 'cancelar' ignora cualquier número", async () => {
+  const client = clienteFalso({ intent: "cancelar", numero_elegido: 1 });
   const resultado = await interpretarSeleccion(client, {
     mensajeCliente: "mejor cancela",
     horariosOfrecidos: HORARIOS_OFRECIDOS,

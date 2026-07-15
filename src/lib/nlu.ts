@@ -145,20 +145,24 @@ const TOOL_INTERPRETAR_SELECCION: Anthropic.Tool = {
         description:
           "'seleccion' si el cliente eligió claramente uno de los horarios de la lista. 'cancelar' si pidió cancelar. 'otro' si no queda claro cuál eligió o pidió algo distinto (ej. otro día, otra pregunta).",
       },
-      indice_seleccionado: {
+      numero_elegido: {
         type: ["integer", "null"],
         description:
-          "Índice (0-based) del horario de la lista que el cliente eligió, solo si intent es 'seleccion'. null en cualquier otro caso.",
+          "Número de la opción que el cliente eligió (empezando en 1, tal como se le mostró la lista al cliente), solo si intent es 'seleccion'. null en cualquier otro caso.",
       },
     },
-    required: ["intent", "indice_seleccionado"],
+    required: ["intent", "numero_elegido"],
   },
 };
 
+// Numerado desde 1: debe coincidir exactamente con cómo se le muestra la
+// lista al cliente en el mensaje de WhatsApp (ver formatearOfertaHorarios en
+// mensajes.ts), para que "el 2" del cliente y el número que interpreta Claude
+// se refieran a la misma opción.
 function construirSystemPromptSeleccion(horariosOfrecidos: string[]): string {
-  const lista = horariosOfrecidos.map((h, i) => `${i}: ${h}`).join("\n");
+  const lista = horariosOfrecidos.map((h, i) => `${i + 1}: ${h}`).join("\n");
   return [
-    "Eres el asistente de agendamiento de un negocio. Le ofreciste al cliente estos horarios (índice: fecha y hora local):",
+    "Eres el asistente de agendamiento de un negocio. Le ofreciste al cliente estos horarios, numerados igual que se los mostraste (número: fecha y hora local):",
     lista,
     "El cliente respondió por WhatsApp. Interpreta su respuesta usando la herramienta interpretar_seleccion.",
   ].join("\n");
@@ -191,16 +195,16 @@ export async function interpretarSeleccion(
     ? (input.intent as IntentSeleccion)
     : "otro";
 
-  const indiceCrudo = input.indice_seleccionado;
-  const indiceValido =
+  const numeroCrudo = input.numero_elegido;
+  const numeroValido =
     intent === "seleccion" &&
-    typeof indiceCrudo === "number" &&
-    Number.isInteger(indiceCrudo) &&
-    indiceCrudo >= 0 &&
-    indiceCrudo < params.horariosOfrecidos.length;
+    typeof numeroCrudo === "number" &&
+    Number.isInteger(numeroCrudo) &&
+    numeroCrudo >= 1 &&
+    numeroCrudo <= params.horariosOfrecidos.length;
 
   return {
     intent,
-    indiceSeleccionado: indiceValido ? (indiceCrudo as number) : null,
+    indiceSeleccionado: numeroValido ? (numeroCrudo as number) - 1 : null,
   };
 }

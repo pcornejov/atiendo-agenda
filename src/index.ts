@@ -2,12 +2,16 @@ import Anthropic from "@anthropic-ai/sdk";
 import { obtenerSlotsDisponibles } from "./lib/disponibilidad.ts";
 import { interpretarSolicitud } from "./lib/nlu.ts";
 import { utcToZoned, diaSemanaDeFecha, nombreDiaSemana } from "./lib/tz.ts";
+import { parsearMensajeWhatsApp } from "./lib/webhook.ts";
+import { procesarMensajeEntrante } from "./lib/flujo.ts";
 
 export interface Env {
   DB: D1Database;
   // Secrets: `wrangler secret put <NOMBRE>` en prod, `.dev.vars` en local.
+  // El phone_number_id de cada negocio vive en negocios.whatsapp_phone_number_id
+  // (un solo Worker puede atender varios pilotos, cada uno con su propio
+  // número); WHATSAPP_TOKEN es el token de la app de Meta, compartido.
   WHATSAPP_TOKEN: string;
-  WHATSAPP_PHONE_NUMBER_ID: string;
   WHATSAPP_VERIFY_TOKEN: string;
   ANTHROPIC_API_KEY: string;
 }
@@ -95,17 +99,25 @@ export default {
     }
 
     if (request.method === "POST" && url.pathname === "/webhook") {
-      // TODO(próxima sesión): parsear el payload del webhook, rutear al
-      // negocio correcto vía metadata.phone_number_id, interpretar el
-      // mensaje con Claude Haiku, calcular disponibilidad contra
-      // horarios_disponibles + citas, responder por la API de WhatsApp
-      // (mensaje de servicio, gratis dentro de la ventana de 24h), manejar
-      // "cancelar" contra conversaciones_estado/citas.
-      //
-      // Por ahora: drenar el body (para que Meta no reintente por timeout)
-      // y responder 200 de inmediato — WhatsApp exige un ack rápido
-      // independiente del procesamiento posterior.
-      await request.text();
+      const body = await request.json().catch(() => null);
+      const mensaje = body ? parsearMensajeWhatsApp(body) : null;
+
+      if (mensaje) {
+        // Se procesa antes de responder (en vez de ctx.waitUntil) para que
+        // cualquier error quede en los logs de este request y no se pierda
+        // en una tarea en background — el volumen esperado (pocos pilotos,
+        // un mensaje a la vez) hace esto rápido de sobra dentro del timeout
+        // de ack de WhatsApp.
+        await procesarMensajeEntrante({
+          db: env.DB,
+          claude: new Anthropic({ apiKey: env.ANTHROPIC_API_KEY }),
+          whatsappToken: env.WHATSAPP_TOKEN,
+          mensaje,
+        });
+      }
+      // Si no hay mensaje de texto (status update, otro tipo de mensaje,
+      // payload inesperado) no hay nada que procesar, pero igual se
+      // responde 200 — WhatsApp reintenta si no recibe un ack rápido.
       return new Response("OK", { status: 200 });
     }
 

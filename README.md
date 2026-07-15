@@ -13,26 +13,26 @@ multi-profesional, pagos ni panel de administración — eso es Fase 2/3.
 Estrategia: 3-5 pilotos gratis, cargados **a mano** en la base de datos por el
 dueño del negocio (ver [`seed.sql`](./seed.sql)) — sin panel self-service todavía.
 
-## Qué NO está construido todavía
+## Cómo funciona el flujo conversacional
 
-Ya existen:
-- **Motor de disponibilidad** (`src/lib/disponibilidad.ts` + `src/lib/tz.ts`): cruza
-  `horarios_disponibles` con `citas` activas y devuelve los próximos slots libres de
-  un negocio, con filtro opcional por fecha/franja horaria, manejando la zona horaria
-  de cada negocio con el `Intl` nativo.
-- **Interpretación de lenguaje natural** (`src/lib/nlu.ts`): usa Claude Haiku (tool
-  use forzado, respuesta estructurada) para extraer intención + fecha/franja
-  preferida de un mensaje nuevo del cliente, y para interpretar cuál horario ofrecido
-  eligió cuando ya hay opciones sobre la mesa.
+`POST /webhook` ya es el flujo completo (`src/lib/flujo.ts`):
 
-El Worker todavía es un stub en lo conversacional — no arma ni envía respuestas de
-WhatsApp. Lo que falta (próximas sesiones):
+1. Parsea el payload de WhatsApp (`src/lib/webhook.ts`) — ignora todo lo que no sea
+   un mensaje de texto (confirmaciones de entrega, otros tipos de mensaje, etc.).
+2. Rutea al negocio dueño de ese `phone_number_id`.
+3. Si hay una conversación pendiente (`conversaciones_estado`, ej. "le ofrecí
+   horarios, espero que elija uno"), interpreta la respuesta con
+   `interpretarSeleccion`; si no, interpreta el mensaje como una solicitud nueva con
+   `interpretarSolicitud` (ambas en `src/lib/nlu.ts`, Claude Haiku).
+4. Según la intención: busca disponibilidad y ofrece horarios (guardando el estado
+   pendiente), crea la cita si el cliente eligió una opción (con un re-chequeo de
+   solapamiento justo antes de insertar, `src/lib/reserva.ts`), o cancela la próxima
+   cita activa del cliente.
+5. Responde por WhatsApp (`src/lib/whatsapp.ts`) con el texto correspondiente
+   (`src/lib/mensajes.ts`).
 
-- Flujo de agendamiento y confirmación end-to-end (state machine sobre
-  `conversaciones_estado`, uniendo NLU + disponibilidad + creación de la cita)
-- Cancelación de citas
-- Parseo del payload real del webhook de WhatsApp y envío de respuestas
-- Envío real de recordatorios (mensaje de plantilla) desde el cron
+Lo que falta (próxima sesión): el cron de recordatorios todavía es un stub — falta
+la query real + el envío del mensaje de plantilla (fuera de la ventana de 24h).
 
 ## Prerequisitos
 
@@ -66,16 +66,17 @@ npm run dev
 
 ```
 WHATSAPP_TOKEN=...
-WHATSAPP_PHONE_NUMBER_ID=...
 WHATSAPP_VERIFY_TOKEN=...
 ANTHROPIC_API_KEY=...
 ```
+
+(El `phone_number_id` no es un secret global: vive en `negocios.whatsapp_phone_number_id`,
+uno por negocio piloto — ver `seed.sql`.)
 
 **Producción**:
 
 ```bash
 npx wrangler secret put WHATSAPP_TOKEN
-npx wrangler secret put WHATSAPP_PHONE_NUMBER_ID
 npx wrangler secret put WHATSAPP_VERIFY_TOKEN
 npx wrangler secret put ANTHROPIC_API_KEY
 ```
@@ -129,6 +130,34 @@ curl -X POST http://localhost:8787/interno/interpretar \
   -H "content-type: application/json" \
   -d '{"negocio_id": 1, "mensaje": "tienen hora el jueves en la tarde?"}'
 ```
+
+## Probar el flujo completo con un mensaje simulado
+
+Con `ANTHROPIC_API_KEY` real en `.dev.vars`, se puede simular un mensaje entrante de
+WhatsApp sin necesidad de un número real ni de `WHATSAPP_TOKEN` válido (fallará recién
+al intentar *responder*, lo cual ya alcanza para ver qué entendió el bot en los logs
+de `wrangler dev`):
+
+```bash
+curl -X POST http://localhost:8787/webhook -H "content-type: application/json" -d '{
+  "entry": [{"changes": [{"value": {
+    "metadata": {"phone_number_id": "123456789012345"},
+    "contacts": [{"profile": {"name": "Cliente Prueba"}, "wa_id": "56911112222"}],
+    "messages": [{"from": "56911112222", "id": "wamid.1", "type": "text", "text": {"body": "tienen hora el jueves en la tarde?"}}]
+  }}]}]
+}'
+```
+
+Para ver la cita creada (o el estado de conversación pendiente con los horarios
+ofrecidos) mientras se prueba:
+
+```bash
+npx wrangler d1 execute atiendo-agenda-db --local --command="SELECT * FROM citas; SELECT * FROM conversaciones_estado;"
+```
+
+Con un `WHATSAPP_TOKEN` real (y un número de prueba de Meta agregado como receptor)
+ya se puede probar la conversación de punta a punta, incluyendo la respuesta que
+llega al teléfono.
 
 ## Schema
 
