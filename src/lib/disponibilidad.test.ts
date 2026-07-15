@@ -67,6 +67,39 @@ test("slots en el pasado (respecto a ahoraUtc) se excluyen", () => {
   assert.deepEqual(horasLocales, ["2026-07-16 11:30"]);
 });
 
+test("rangoHorario filtra por franja, respetando el límite manana/tarde a las 12:00", () => {
+  // Bloque 11:00-14:00, servicio de 60min: candidatos 11:00, 12:00, 13:00.
+  const horarios = [{ diaSemana: 4, horaInicio: "11:00", horaFin: "14:00" }];
+
+  const soloManana = calcularSlotsDelDia({
+    fechaYMD: "2026-07-16",
+    timezone: "America/Santiago",
+    duracionMinutos: 60,
+    horarios,
+    ocupados: [],
+    ahoraUtc: AHORA_MUY_TEMPRANO,
+    rangoHorario: "manana",
+  });
+  assert.deepEqual(
+    soloManana.map((s) => s.inicioLocal),
+    ["2026-07-16 11:00"]
+  );
+
+  const soloTarde = calcularSlotsDelDia({
+    fechaYMD: "2026-07-16",
+    timezone: "America/Santiago",
+    duracionMinutos: 60,
+    horarios,
+    ocupados: [],
+    ahoraUtc: AHORA_MUY_TEMPRANO,
+    rangoHorario: "tarde",
+  });
+  assert.deepEqual(
+    soloTarde.map((s) => s.inicioLocal),
+    ["2026-07-16 12:00", "2026-07-16 13:00"]
+  );
+});
+
 test("dos citas que se tocan en el borde no se consideran superpuestas", () => {
   // La cita ocupa exactamente 10:00-10:45; el slot 10:45-11:30 debe seguir libre
   const slots = calcularSlotsDelDia({

@@ -17,6 +17,21 @@ export interface SlotDisponible {
   inicioLocal: string; // 'YYYY-MM-DD HH:MM' — usar esto para mostrarle la hora al cliente
 }
 
+export type RangoHorario = "manana" | "tarde" | "noche";
+
+// Franjas horarias en minutos desde medianoche, hora local del negocio.
+const LIMITES_RANGO_HORARIO: Record<RangoHorario, [number, number]> = {
+  manana: [0, 12 * 60],
+  tarde: [12 * 60, 19 * 60],
+  noche: [19 * 60, 24 * 60],
+};
+
+function estaEnRangoHorario(horaHHMM: string, rango: RangoHorario): boolean {
+  const minutos = minutosDesdeHHMM(horaHHMM);
+  const [desde, hasta] = LIMITES_RANGO_HORARIO[rango];
+  return minutos >= desde && minutos < hasta;
+}
+
 function minutosDesdeHHMM(horaHHMM: string): number {
   const [h, m] = horaHHMM.split(":").map(Number);
   return h * 60 + m;
@@ -46,8 +61,9 @@ export function calcularSlotsDelDia(params: {
   horarios: HorarioDisponible[];
   ocupados: RangoOcupado[];
   ahoraUtc: Date;
+  rangoHorario?: RangoHorario;
 }): SlotDisponible[] {
-  const { fechaYMD, timezone, duracionMinutos, horarios, ocupados, ahoraUtc } = params;
+  const { fechaYMD, timezone, duracionMinutos, horarios, ocupados, ahoraUtc, rangoHorario } = params;
   const diaSemana = diaSemanaDeFecha(fechaYMD);
   const horariosDelDia = horarios.filter((h) => h.diaSemana === diaSemana);
   if (horariosDelDia.length === 0) return [];
@@ -69,6 +85,8 @@ export function calcularSlotsDelDia(params: {
       inicioCandidato += duracionMinutos
     ) {
       const horaInicioLocal = hhmmDesdeMinutos(inicioCandidato);
+      if (rangoHorario && !estaEnRangoHorario(horaInicioLocal, rangoHorario)) continue;
+
       const inicioUtc = zonedTimeToUtc(fechaYMD, horaInicioLocal, timezone);
       const finUtc = new Date(inicioUtc.getTime() + duracionMinutos * 60000);
 
@@ -109,13 +127,22 @@ interface CitaRow {
 
 /**
  * Busca los próximos slots libres de un negocio, consultando D1. Recorre
- * días calendario (en la zona horaria del negocio) desde hoy hacia adelante
- * hasta juntar `limite` slots o agotar `diasHaciaAdelante`.
+ * días calendario (en la zona horaria del negocio) desde `fechaInicio` (o
+ * hoy si no se especifica) hacia adelante, hasta juntar `limite` slots o
+ * agotar `diasHaciaAdelante`. Si se pasa `fechaInicio` y ese día no tiene
+ * cupo, sigue buscando en los días siguientes — así "el jueves" naturalmente
+ * ofrece el próximo día disponible si el jueves ya está lleno.
  */
 export async function obtenerSlotsDisponibles(
   db: D1Database,
   negocioId: number,
-  opciones: { diasHaciaAdelante?: number; limite?: number; ahoraUtc?: Date } = {}
+  opciones: {
+    diasHaciaAdelante?: number;
+    limite?: number;
+    ahoraUtc?: Date;
+    fechaInicio?: string; // 'YYYY-MM-DD'; se ignora si cae antes de hoy
+    rangoHorario?: RangoHorario;
+  } = {}
 ): Promise<SlotDisponible[]> {
   const diasHaciaAdelante = opciones.diasHaciaAdelante ?? 14;
   const limite = opciones.limite ?? 3;
@@ -139,12 +166,14 @@ export async function obtenerSlotsDisponibles(
   if (horarios.length === 0) return [];
 
   const { fechaYMD: hoyYMD } = utcToZoned(ahoraUtc, negocio.timezone);
-  const fechaLimiteYMD = sumarDias(hoyYMD, diasHaciaAdelante);
+  const fechaInicioBusqueda =
+    opciones.fechaInicio && opciones.fechaInicio > hoyYMD ? opciones.fechaInicio : hoyYMD;
+  const fechaLimiteYMD = sumarDias(fechaInicioBusqueda, diasHaciaAdelante);
 
   // Rango de sobra para la query (no necesita ser exacto: el cruce fino de
   // horarios ocurre en calcularSlotsDelDia). Se usa medianoche UTC de las
   // fechas límite, que siempre es igual o anterior a la medianoche local.
-  const [y1, m1, d1] = hoyYMD.split("-").map(Number);
+  const [y1, m1, d1] = fechaInicioBusqueda.split("-").map(Number);
   const [y2, m2, d2] = fechaLimiteYMD.split("-").map(Number);
   const desdeUtc = new Date(Date.UTC(y1, m1 - 1, d1)).toISOString();
   const hastaUtc = new Date(Date.UTC(y2, m2 - 1, d2, 23, 59, 59)).toISOString();
@@ -163,7 +192,7 @@ export async function obtenerSlotsDisponibles(
   }));
 
   const slots: SlotDisponible[] = [];
-  let fechaYMD = hoyYMD;
+  let fechaYMD = fechaInicioBusqueda;
   for (let i = 0; i < diasHaciaAdelante && slots.length < limite; i++) {
     const slotsDelDia = calcularSlotsDelDia({
       fechaYMD,
@@ -172,6 +201,7 @@ export async function obtenerSlotsDisponibles(
       horarios,
       ocupados,
       ahoraUtc,
+      rangoHorario: opciones.rangoHorario,
     });
     slots.push(...slotsDelDia);
     fechaYMD = sumarDias(fechaYMD, 1);

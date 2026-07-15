@@ -15,15 +15,23 @@ dueño del negocio (ver [`seed.sql`](./seed.sql)) — sin panel self-service tod
 
 ## Qué NO está construido todavía
 
-Ya existe el motor de disponibilidad (`src/lib/disponibilidad.ts` + `src/lib/tz.ts`:
-cruza `horarios_disponibles` con `citas` activas y devuelve los próximos slots
-libres de un negocio, manejando la zona horaria de cada negocio con el `Intl`
-nativo). El Worker sigue siendo un stub en lo conversacional. Lo que falta
-(próximas sesiones):
+Ya existen:
+- **Motor de disponibilidad** (`src/lib/disponibilidad.ts` + `src/lib/tz.ts`): cruza
+  `horarios_disponibles` con `citas` activas y devuelve los próximos slots libres de
+  un negocio, con filtro opcional por fecha/franja horaria, manejando la zona horaria
+  de cada negocio con el `Intl` nativo.
+- **Interpretación de lenguaje natural** (`src/lib/nlu.ts`): usa Claude Haiku (tool
+  use forzado, respuesta estructurada) para extraer intención + fecha/franja
+  preferida de un mensaje nuevo del cliente, y para interpretar cuál horario ofrecido
+  eligió cuando ya hay opciones sobre la mesa.
 
-- Interpretación de lenguaje natural con Claude Haiku
-- Flujo de agendamiento y confirmación por WhatsApp (usando el motor de disponibilidad)
+El Worker todavía es un stub en lo conversacional — no arma ni envía respuestas de
+WhatsApp. Lo que falta (próximas sesiones):
+
+- Flujo de agendamiento y confirmación end-to-end (state machine sobre
+  `conversaciones_estado`, uniendo NLU + disponibilidad + creación de la cita)
 - Cancelación de citas
+- Parseo del payload real del webhook de WhatsApp y envío de respuestas
 - Envío real de recordatorios (mensaje de plantilla) desde el cron
 
 ## Prerequisitos
@@ -108,6 +116,18 @@ chequear a mano los próximos horarios libres de un negocio recién cargado:
 
 ```bash
 curl "http://localhost:8787/interno/disponibilidad?negocio_id=1&limite=5"
+```
+
+## Probar la interpretación de mensajes (Claude Haiku)
+
+`POST /interno/interpretar` simula el mensaje de un cliente y muestra qué entendió
+el bot (intención + fecha/franja preferida) y qué horarios le ofrecería, sin pasar
+por WhatsApp. Requiere `ANTHROPIC_API_KEY` real en `.dev.vars`:
+
+```bash
+curl -X POST http://localhost:8787/interno/interpretar \
+  -H "content-type: application/json" \
+  -d '{"negocio_id": 1, "mensaje": "tienen hora el jueves en la tarde?"}'
 ```
 
 ## Schema

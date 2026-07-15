@@ -64,6 +64,21 @@ export function diaSemanaDeFecha(fechaYMD: string): number {
   return new Date(Date.UTC(anio, mes - 1, dia)).getUTCDay();
 }
 
+const NOMBRES_DIA_SEMANA = [
+  "domingo",
+  "lunes",
+  "martes",
+  "miércoles",
+  "jueves",
+  "viernes",
+  "sábado",
+];
+
+/** Nombre en español de un día de la semana (0=domingo..6=sábado). */
+export function nombreDiaSemana(diaSemana: number): string {
+  return NOMBRES_DIA_SEMANA[diaSemana];
+}
+
 /** Suma `dias` días calendario a una fecha 'YYYY-MM-DD' (sin componente horario). */
 export function sumarDias(fechaYMD: string, dias: number): string {
   const [anio, mes, dia] = fechaYMD.split("-").map(Number);

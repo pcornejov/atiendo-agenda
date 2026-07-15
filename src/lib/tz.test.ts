@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { zonedTimeToUtc, utcToZoned, diaSemanaDeFecha, sumarDias } from "./tz.ts";
+import { zonedTimeToUtc, utcToZoned, diaSemanaDeFecha, sumarDias, nombreDiaSemana } from "./tz.ts";
 
 test("zonedTimeToUtc: America/Santiago en invierno (UTC-4)", () => {
   const utc = zonedTimeToUtc("2026-07-16", "14:00", "America/Santiago");
@@ -40,4 +40,8 @@ test("sumarDias avanza cruzando fin de mes", () => {
 
 test("sumarDias con 0 no cambia la fecha", () => {
   assert.equal(sumarDias("2026-07-16", 0), "2026-07-16");
+});
+
+test("nombreDiaSemana: jueves", () => {
+  assert.equal(nombreDiaSemana(diaSemanaDeFecha("2026-07-16")), "jueves");
 });

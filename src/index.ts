@@ -1,4 +1,7 @@
+import Anthropic from "@anthropic-ai/sdk";
 import { obtenerSlotsDisponibles } from "./lib/disponibilidad.ts";
+import { interpretarSolicitud } from "./lib/nlu.ts";
+import { utcToZoned, diaSemanaDeFecha, nombreDiaSemana } from "./lib/tz.ts";
 
 export interface Env {
   DB: D1Database;
@@ -29,6 +32,53 @@ export default {
         diasHaciaAdelante: dias,
       });
       return Response.json({ negocio_id: negocioId, slots });
+    }
+
+    if (request.method === "POST" && url.pathname === "/interno/interpretar") {
+      // Herramienta manual de verificación del NLU (Claude Haiku) mientras no
+      // hay panel: simula el mensaje de un cliente y muestra qué entendió el
+      // bot + qué horarios le ofrecería, sin pasar por WhatsApp.
+      //   POST /interno/interpretar  { "negocio_id": 1, "mensaje": "tienen hora el jueves en la tarde?" }
+      const body = (await request.json().catch(() => null)) as
+        | { negocio_id?: number; mensaje?: string }
+        | null;
+      if (!body?.negocio_id || !body?.mensaje) {
+        return new Response("El body debe incluir negocio_id y mensaje", { status: 400 });
+      }
+
+      const negocio = await env.DB.prepare(
+        "SELECT servicio_nombre, duracion_minutos, timezone FROM negocios WHERE id = ? AND activo = 1"
+      )
+        .bind(body.negocio_id)
+        .first<{ servicio_nombre: string; duracion_minutos: number; timezone: string }>();
+      if (!negocio) {
+        return new Response("Negocio no encontrado", { status: 404 });
+      }
+
+      const ahoraUtc = new Date();
+      const { fechaYMD: hoyYMD } = utcToZoned(ahoraUtc, negocio.timezone);
+      const diaSemanaHoyTexto = nombreDiaSemana(diaSemanaDeFecha(hoyYMD));
+
+      const claude = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+      const interpretacion = await interpretarSolicitud(claude, {
+        mensajeCliente: body.mensaje,
+        servicioNombre: negocio.servicio_nombre,
+        duracionMinutos: negocio.duracion_minutos,
+        hoyYMD,
+        diaSemanaHoyTexto,
+      });
+
+      const slots =
+        interpretacion.intent === "consultar_disponibilidad"
+          ? await obtenerSlotsDisponibles(env.DB, body.negocio_id, {
+              limite: 3,
+              ahoraUtc,
+              fechaInicio: interpretacion.fechaPreferida ?? undefined,
+              rangoHorario: interpretacion.rangoHorarioPreferido ?? undefined,
+            })
+          : [];
+
+      return Response.json({ interpretacion, slots });
     }
 
     if (request.method === "GET" && url.pathname === "/webhook") {
