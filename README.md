@@ -15,13 +15,14 @@ dueño del negocio (ver [`seed.sql`](./seed.sql)) — sin panel self-service tod
 
 ## Qué NO está construido todavía
 
-Este repo por ahora es **solo el andamiaje**: estructura del proyecto, schema D1
-real, y un Worker stub que responde al webhook y al cron trigger pero no tiene
-lógica de negocio. Lo que falta (próximas sesiones):
+Ya existe el motor de disponibilidad (`src/lib/disponibilidad.ts` + `src/lib/tz.ts`:
+cruza `horarios_disponibles` con `citas` activas y devuelve los próximos slots
+libres de un negocio, manejando la zona horaria de cada negocio con el `Intl`
+nativo). El Worker sigue siendo un stub en lo conversacional. Lo que falta
+(próximas sesiones):
 
 - Interpretación de lenguaje natural con Claude Haiku
-- Cálculo de disponibilidad (horarios_disponibles - citas existentes)
-- Flujo de agendamiento y confirmación por WhatsApp
+- Flujo de agendamiento y confirmación por WhatsApp (usando el motor de disponibilidad)
 - Cancelación de citas
 - Envío real de recordatorios (mensaje de plantilla) desde el cron
 
@@ -89,6 +90,24 @@ duración, horarios) y correrlo con:
 
 ```bash
 npx wrangler d1 execute atiendo-agenda-db --remote --file=./seed.sql
+```
+
+## Tests
+
+Las funciones puras de `src/lib/` (conversión de zona horaria, cálculo de slots)
+tienen tests con `node:test` (nativo de Node, sin dependencias extra):
+
+```bash
+npm run test
+```
+
+## Verificar disponibilidad de un piloto
+
+Mientras no hay panel de administración, `GET /interno/disponibilidad` sirve para
+chequear a mano los próximos horarios libres de un negocio recién cargado:
+
+```bash
+curl "http://localhost:8787/interno/disponibilidad?negocio_id=1&limite=5"
 ```
 
 ## Schema
