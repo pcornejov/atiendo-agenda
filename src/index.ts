@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { obtenerSlotsDisponibles } from "./lib/disponibilidad.ts";
 import { interpretarSolicitud } from "./lib/nlu.ts";
+import { moduloAgendamiento } from "./lib/modulos/agendamiento.ts";
 import { utcToZoned, diaSemanaDeFecha, nombreDiaSemana } from "./lib/tz.ts";
 import { parsearMensajeWhatsApp } from "./lib/webhook.ts";
 import { procesarMensajeEntrante } from "./lib/flujo.ts";
@@ -77,6 +78,9 @@ export default {
         duracionMinutos: negocio.duracion_minutos,
         hoyYMD,
         diaSemanaHoyTexto,
+        // Esta ruta de debug simula solo el módulo de agendamiento, aunque el
+        // negocio real pueda tener otros módulos activos también.
+        intentsDisponibles: moduloAgendamiento.intents,
       });
 
       const slots =

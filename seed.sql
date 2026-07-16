@@ -33,3 +33,13 @@ VALUES
   ((SELECT id FROM negocios WHERE whatsapp_phone_number_id = '123456789012345'), 4, '10:00', '19:00'),
   ((SELECT id FROM negocios WHERE whatsapp_phone_number_id = '123456789012345'), 5, '10:00', '19:00'),
   ((SELECT id FROM negocios WHERE whatsapp_phone_number_id = '123456789012345'), 6, '10:00', '18:00');
+
+-- Suscripción activa en plan Básico: sin esto, el bot no responde nada — la
+-- arquitectura de módulos (ver src/lib/flujo.ts) solo ofrece los intents de
+-- los módulos que el plan activo del negocio incluye.
+INSERT INTO negocio_suscripciones (negocio_id, plan_id, estado)
+VALUES (
+  (SELECT id FROM negocios WHERE whatsapp_phone_number_id = '123456789012345'),
+  (SELECT id FROM planes WHERE codigo = 'basico'),
+  'activa'
+);

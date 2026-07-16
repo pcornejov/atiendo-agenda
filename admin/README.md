@@ -8,15 +8,23 @@ Cloudflare Workers separado (Astro + adapter de Cloudflare), que comparte la
 misma base D1 que el bot (`../wrangler.jsonc`) — no importa código del bot,
 solo apunta al mismo `database_id`.
 
-**Estado actual**: login, autorización por rol, y la integración con Flow
+**Estado actual**: login, autorización por rol, la integración con Flow
 (selección de plan, alta de cliente y registro de tarjeta, webhook de
-confirmación) ya están construidos — ver advertencia sobre Flow más abajo, no
-está probado contra una cuenta sandbox real todavía. La **arquitectura de
-módulos del bot** (que el plan de cada negocio determine qué puede responder
-su chatbot — agendamiento, venta de comida) todavía no está conectada: hoy
-el bot sigue respondiendo exactamente igual que antes de este cambio (solo
-agendamiento), sin importar el plan/estado de `negocio_suscripciones`. Ver
-"Qué falta" más abajo.
+confirmación — ver advertencia sobre Flow más abajo, no probada contra una
+cuenta sandbox real todavía), y la **arquitectura de módulos del bot** ya
+están construidos: el bot (`../src/lib/flujo.ts`, `../src/lib/modulos/`)
+consulta `negocio_suscripciones`/`plan_modulos` en cada mensaje y solo
+responde a los intents de los módulos que el plan activo del negocio incluye.
+Hoy solo existe el módulo `agendamiento` (mismo comportamiento que antes de
+este cambio) — el módulo de venta de comida (Nivel 2) todavía no está
+implementado del lado del bot, aunque su schema ya existe. Ver "Qué falta"
+más abajo.
+
+**Importante**: un negocio sin ninguna suscripción `'activa'` no recibe
+ninguna respuesta del bot — el botón "Activar plan a mano" en
+`/negocios/[id]/editar` (solo `admin`) es la forma de darle un plan a un
+negocio dado de alta directamente (sin pasar por Flow), y es un paso
+obligatorio, no opcional, al crear un negocio nuevo desde `/negocios/nuevo`.
 
 ## Setup local
 
@@ -167,7 +175,8 @@ npm run typecheck   # astro check
   vieja `/negocios` (que listaba todo sin distinguir roles).
 - `src/pages/negocios/[id]/` — editar, horarios, citas: scoped por
   `negocioId`, con `puedeAdministrarNegocio` chequeado en cada página (no solo
-  ocultando el link en la navegación — la URL es adivinable).
+  ocultando el link en la navegación — la URL es adivinable). `editar.astro`
+  incluye, solo para `admin`, el botón para activar un plan a mano (sin Flow).
 
 ## Limitación real: el número de WhatsApp sigue siendo manual
 
@@ -184,11 +193,6 @@ no está construida todavía.
 - **Verificar Flow contra una cuenta sandbox real** (ver advertencia arriba)
   y construir el paso de `crearSuscripcionFlow` en el retorno del registro de
   tarjeta.
-- **Arquitectura de módulos del bot**: `nlu.ts`/`flujo.ts` (en el repo del
-  bot) todavía no consultan `negocio_suscripciones`/`plan_modulos` — todo
-  negocio sigue teniendo el comportamiento actual de agendamiento sin
-  importar su plan. Es decir: la idea original de "autogestionar qué puede
-  responder tu chatbot" todavía no está conectada de punta a punta.
 - **Módulo de venta de comida (Nivel 2)**: el schema (`menu_items`, `pedidos`,
   `pedido_items`) ya existe, pero no hay intents de NLU ni pantallas de admin
   todavía.

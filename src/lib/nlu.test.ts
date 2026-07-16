@@ -26,12 +26,19 @@ function clienteFalso(inputToolUse: unknown, nombreHerramienta?: string): Client
   };
 }
 
+const INTENTS_AGENDAMIENTO = [
+  { nombre: "consultar_disponibilidad", descripcion: "el cliente pide hora." },
+  { nombre: "consultar_mi_cita", descripcion: "el cliente pregunta por una cita ya agendada." },
+  { nombre: "cancelar", descripcion: "el cliente pide cancelar." },
+];
+
 const PARAMS_BASE = {
   mensajeCliente: "tienen hora el jueves en la tarde?",
   servicioNombre: "Corte de pelo",
   duracionMinutos: 45,
   hoyYMD: "2026-07-15",
   diaSemanaHoyTexto: "miércoles",
+  intentsDisponibles: INTENTS_AGENDAMIENTO,
 };
 
 test("interpretarSolicitud: mapea una respuesta válida de Claude", async () => {

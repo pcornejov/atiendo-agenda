@@ -282,6 +282,25 @@ export async function guardarClienteFlow(db: D1Database, negocioId: number, flow
     .run();
 }
 
+/**
+ * Activa un plan a mano, sin pasar por Flow — para un negocio dado de alta
+ * directamente por el administrador (ej. un piloto de cortesía), que nunca
+ * pasa por /onboarding/plan. Sin esto, un negocio creado desde
+ * /negocios/nuevo se queda sin ningún módulo activo y el bot no le
+ * respondería nada.
+ */
+export async function asignarPlanManual(db: D1Database, negocioId: number, planId: number): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO negocio_suscripciones (negocio_id, plan_id, estado)
+       VALUES (?, ?, 'activa')
+       ON CONFLICT (negocio_id) DO UPDATE SET
+         plan_id = excluded.plan_id, estado = 'activa', updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`
+    )
+    .bind(negocioId, planId)
+    .run();
+}
+
 export async function activarSuscripcion(
   db: D1Database,
   negocioId: number,

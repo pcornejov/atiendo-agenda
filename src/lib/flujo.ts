@@ -1,41 +1,37 @@
-// Orquesta un mensaje entrante de WhatsApp: decide qué está pidiendo el
-// cliente (con ayuda de nlu.ts), consulta/actualiza disponibilidad y citas,
-// y responde por WhatsApp. No tiene tests unitarios propios porque es
-// pegamento de I/O (D1 + Claude + WhatsApp) — se verifica de punta a punta
-// con wrangler dev (ver README).
+// Orquesta un mensaje entrante de WhatsApp: mira qué módulos tiene activos
+// el negocio (según su plan/suscripción), arma la tool de Claude con los
+// intents de esos módulos (con ayuda de nlu.ts), y despacha al módulo dueño
+// del intent devuelto. No tiene tests unitarios propios porque es pegamento
+// de I/O (D1 + Claude + WhatsApp) — se verifica de punta a punta con
+// wrangler dev (ver README).
 
-import { obtenerSlotsDisponibles, type SlotDisponible } from "./disponibilidad.ts";
-import { interpretarSolicitud, interpretarSeleccion, type ClienteClaude } from "./nlu.ts";
-import { obtenerEstadoVigente, guardarEstado, limpiarEstado } from "./conversacion.ts";
-import { crearCita, cancelarCitaActiva, buscarCitaActiva } from "./reserva.ts";
+import { interpretarSolicitud, type ClienteClaude } from "./nlu.ts";
+import { obtenerEstadoVigente, limpiarEstado } from "./conversacion.ts";
 import { enviarMensajeWhatsApp } from "./whatsapp.ts";
 import { utcToZoned, diaSemanaDeFecha, nombreDiaSemana } from "./tz.ts";
-import {
-  formatearOfertaHorarios,
-  formatearRepetirOpciones,
-  formatearSinHorarios,
-  formatearConfirmacion,
-  formatearSlotYaNoDisponible,
-  formatearCancelacionExitosa,
-  formatearSinCitaParaCancelar,
-  formatearMiCita,
-  formatearSinCitaParaConsultar,
-  formatearFallback,
-} from "./mensajes.ts";
+import { formatearFallback } from "./mensajes.ts";
+import { moduloAgendamiento } from "./modulos/agendamiento.ts";
+import type { DefinicionModulo, NegocioRow, ContextoModulo } from "./modulos/tipos.ts";
 import type { MensajeEntrante } from "./webhook.ts";
 
-const MINUTOS_EXPIRACION_ESTADO = 30;
+// Catálogo de módulos que el bot sabe manejar. Cuáles están ACTIVOS para un
+// negocio en particular se decide en obtenerModulosActivos, por su
+// suscripción — no acá.
+const MODULOS_DISPONIBLES: DefinicionModulo[] = [moduloAgendamiento];
 
-interface NegocioRow {
-  id: number;
-  servicio_nombre: string;
-  duracion_minutos: number;
-  timezone: string;
-  whatsapp_phone_number_id: string;
-}
-
-interface ContextoSeleccion {
-  slots: SlotDisponible[];
+async function obtenerModulosActivos(db: D1Database, negocioId: number): Promise<DefinicionModulo[]> {
+  const resultado = await db
+    .prepare(
+      `SELECT DISTINCT m.codigo
+       FROM negocio_suscripciones s
+       JOIN plan_modulos pm ON pm.plan_id = s.plan_id
+       JOIN modulos m ON m.id = pm.modulo_id
+       WHERE s.negocio_id = ? AND s.estado = 'activa'`
+    )
+    .bind(negocioId)
+    .all<{ codigo: string }>();
+  const codigosActivos = new Set(resultado.results.map((r) => r.codigo));
+  return MODULOS_DISPONIBLES.filter((modulo) => codigosActivos.has(modulo.codigo));
 }
 
 export async function procesarMensajeEntrante(params: {
@@ -64,23 +60,35 @@ export async function procesarMensajeEntrante(params: {
       texto,
     });
 
-  const { fechaYMD: hoyYMD } = utcToZoned(ahoraUtc, negocio.timezone);
-  const diaSemanaHoyTexto = nombreDiaSemana(diaSemanaDeFecha(hoyYMD));
-
-  const estadoVigente = await obtenerEstadoVigente(db, negocio.id, mensaje.clienteTelefono, ahoraUtc);
-
-  if (estadoVigente?.estado === "esperando_seleccion_horario") {
-    await manejarSeleccion(
-      db,
-      claude,
-      negocio,
-      mensaje,
-      estadoVigente.contexto as ContextoSeleccion,
-      ahoraUtc,
-      enviar
-    );
+  const modulos = await obtenerModulosActivos(db, negocio.id);
+  if (modulos.length === 0) {
+    // Sin plan activo (suscripción vencida/cancelada, o negocio recién
+    // creado sin plan asignado todavía) — no hay nada que el bot pueda
+    // responder. No se manda ningún mensaje para no facturarle un mensaje de
+    // servicio a un negocio que no está pagando.
     return;
   }
+
+  const ctx: ContextoModulo = { db, claude, negocio, mensaje, ahoraUtc, enviar };
+
+  const estadoVigente = await obtenerEstadoVigente(db, negocio.id, mensaje.clienteTelefono, ahoraUtc);
+  if (estadoVigente) {
+    const separador = estadoVigente.estado.indexOf(":");
+    const codigoModulo = separador === -1 ? estadoVigente.estado : estadoVigente.estado.slice(0, separador);
+    const estadoSinPrefijo = separador === -1 ? "" : estadoVigente.estado.slice(separador + 1);
+    const modulo = modulos.find((m) => m.codigo === codigoModulo);
+
+    if (modulo?.manejarEstadoPendiente) {
+      await modulo.manejarEstadoPendiente(estadoSinPrefijo, estadoVigente.contexto, ctx);
+      return;
+    }
+    // Estado de un módulo que ya no está activo (ej. downgrade de plan a
+    // mitad de una conversación) — se descarta y se sigue como mensaje nuevo.
+    await limpiarEstado(db, negocio.id, mensaje.clienteTelefono);
+  }
+
+  const { fechaYMD: hoyYMD } = utcToZoned(ahoraUtc, negocio.timezone);
+  const diaSemanaHoyTexto = nombreDiaSemana(diaSemanaDeFecha(hoyYMD));
 
   const solicitud = await interpretarSolicitud(claude, {
     mensajeCliente: mensaje.texto,
@@ -88,119 +96,12 @@ export async function procesarMensajeEntrante(params: {
     duracionMinutos: negocio.duracion_minutos,
     hoyYMD,
     diaSemanaHoyTexto,
+    intentsDisponibles: modulos.flatMap((m) => m.intents),
   });
 
-  if (solicitud.intent === "cancelar") {
-    await manejarCancelacion(db, negocio, mensaje, ahoraUtc, enviar);
-    return;
-  }
-
-  if (solicitud.intent === "consultar_mi_cita") {
-    const resultado = await buscarCitaActiva(
-      db,
-      negocio.id,
-      mensaje.clienteTelefono,
-      ahoraUtc,
-      negocio.timezone
-    );
-    if (resultado.ok) {
-      await enviar(formatearMiCita(resultado.cita, negocio.servicio_nombre));
-    } else {
-      await enviar(formatearSinCitaParaConsultar());
-    }
-    return;
-  }
-
-  if (solicitud.intent === "consultar_disponibilidad") {
-    const slots = await obtenerSlotsDisponibles(db, negocio.id, {
-      limite: 3,
-      ahoraUtc,
-      fechaInicio: solicitud.fechaPreferida ?? undefined,
-      rangoHorario: solicitud.rangoHorarioPreferido ?? undefined,
-    });
-
-    if (slots.length === 0) {
-      await enviar(formatearSinHorarios());
-      return;
-    }
-
-    await guardarEstado(
-      db,
-      negocio.id,
-      mensaje.clienteTelefono,
-      "esperando_seleccion_horario",
-      { slots } satisfies ContextoSeleccion,
-      new Date(ahoraUtc.getTime() + MINUTOS_EXPIRACION_ESTADO * 60000)
-    );
-    await enviar(formatearOfertaHorarios(slots, negocio.servicio_nombre));
-    return;
+  for (const modulo of modulos) {
+    if (await modulo.manejarIntent(solicitud, ctx)) return;
   }
 
   await enviar(formatearFallback(negocio.servicio_nombre));
-}
-
-async function manejarSeleccion(
-  db: D1Database,
-  claude: ClienteClaude,
-  negocio: NegocioRow,
-  mensaje: MensajeEntrante,
-  contexto: ContextoSeleccion,
-  ahoraUtc: Date,
-  enviar: (texto: string) => Promise<void>
-): Promise<void> {
-  const slotsOfrecidos = contexto.slots;
-  const seleccion = await interpretarSeleccion(claude, {
-    mensajeCliente: mensaje.texto,
-    horariosOfrecidos: slotsOfrecidos.map((s) => s.inicioLocal),
-  });
-
-  if (seleccion.intent === "cancelar") {
-    await limpiarEstado(db, negocio.id, mensaje.clienteTelefono);
-    await manejarCancelacion(db, negocio, mensaje, ahoraUtc, enviar);
-    return;
-  }
-
-  if (seleccion.intent === "seleccion" && seleccion.indiceSeleccionado !== null) {
-    const slot = slotsOfrecidos[seleccion.indiceSeleccionado];
-    const resultado = await crearCita(db, {
-      negocioId: negocio.id,
-      clienteTelefono: mensaje.clienteTelefono,
-      clienteNombre: mensaje.clienteNombrePerfil,
-      inicioUtc: slot.inicioUtc,
-      finUtc: slot.finUtc,
-    });
-    await limpiarEstado(db, negocio.id, mensaje.clienteTelefono);
-
-    if (resultado.ok) {
-      await enviar(formatearConfirmacion(slot, negocio.servicio_nombre));
-    } else {
-      await enviar(formatearSlotYaNoDisponible());
-    }
-    return;
-  }
-
-  // "otro": no quedó claro cuál eligió — se le repiten las mismas opciones
-  // (el estado ya guardado sigue vigente, no hace falta volver a guardarlo).
-  await enviar(formatearRepetirOpciones(slotsOfrecidos, negocio.servicio_nombre));
-}
-
-async function manejarCancelacion(
-  db: D1Database,
-  negocio: NegocioRow,
-  mensaje: MensajeEntrante,
-  ahoraUtc: Date,
-  enviar: (texto: string) => Promise<void>
-): Promise<void> {
-  const resultado = await cancelarCitaActiva(
-    db,
-    negocio.id,
-    mensaje.clienteTelefono,
-    ahoraUtc,
-    negocio.timezone
-  );
-  if (resultado.ok) {
-    await enviar(formatearCancelacionExitosa(resultado.citaCancelada));
-  } else {
-    await enviar(formatearSinCitaParaCancelar());
-  }
 }

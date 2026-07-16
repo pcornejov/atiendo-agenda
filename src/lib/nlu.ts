@@ -24,8 +24,17 @@ export interface ClienteClaude {
 
 export const MODELO_HAIKU = "claude-haiku-4-5-20251001";
 
-export type Intent = "consultar_disponibilidad" | "consultar_mi_cita" | "cancelar" | "otro";
+// El intent ya no es un enum fijo: lo componen los módulos activos del
+// negocio (ver src/lib/modulos/) + 'otro'. Cada módulo aporta sus propios
+// nombres de intent con su descripción; interpretarSolicitud arma la tool de
+// Claude dinámicamente a partir de esa lista.
+export type Intent = string;
 export type RangoHorarioPreferido = "manana" | "tarde" | "noche";
+
+export interface DescripcionIntent {
+  nombre: string;
+  descripcion: string;
+}
 
 export interface SolicitudInterpretada {
   intent: Intent;
@@ -33,34 +42,41 @@ export interface SolicitudInterpretada {
   rangoHorarioPreferido: RangoHorarioPreferido | null;
 }
 
-const TOOL_INTERPRETAR_SOLICITUD: Anthropic.Tool = {
-  name: "interpretar_solicitud",
-  description:
-    "Extrae la intención y la preferencia de fecha/hora del mensaje de un cliente que le escribe por WhatsApp a un negocio para agendar una cita.",
-  input_schema: {
-    type: "object",
-    properties: {
-      intent: {
-        type: "string",
-        enum: ["consultar_disponibilidad", "consultar_mi_cita", "cancelar", "otro"],
-        description:
-          "'consultar_disponibilidad' si el cliente pide hora o pregunta por horarios libres para agendar. 'consultar_mi_cita' si pregunta por una cita que ya tiene agendada (ej. 'a qué hora es mi cita', 'cuándo agendé', 'qué día tengo hora'). 'cancelar' si pide cancelar una cita existente. 'otro' para saludos, agradecimientos, o cualquier cosa que no encaje en las anteriores.",
-      },
-      fecha_preferida: {
-        type: ["string", "null"],
-        description:
-          "Fecha en formato YYYY-MM-DD si el cliente mencionó o se puede inferir un día específico (ej. 'jueves', 'mañana', 'el 20'). null si no mencionó ninguna fecha.",
-      },
-      rango_horario_preferido: {
-        type: ["string", "null"],
-        enum: ["manana", "tarde", "noche", null],
-        description:
-          "Franja horaria si el cliente la mencionó explícitamente (ej. 'en la tarde'). null si no aplica.",
-      },
-    },
-    required: ["intent", "fecha_preferida", "rango_horario_preferido"],
-  },
+const INTENT_OTRO: DescripcionIntent = {
+  nombre: "otro",
+  descripcion: "saludos, agradecimientos, o cualquier mensaje que no encaje en las intenciones anteriores.",
 };
+
+function construirToolInterpretarSolicitud(intentsDisponibles: DescripcionIntent[]): Anthropic.Tool {
+  const todos = [...intentsDisponibles, INTENT_OTRO];
+  return {
+    name: "interpretar_solicitud",
+    description:
+      "Extrae la intención y la preferencia de fecha/hora del mensaje de un cliente que le escribe por WhatsApp a un negocio.",
+    input_schema: {
+      type: "object",
+      properties: {
+        intent: {
+          type: "string",
+          enum: todos.map((i) => i.nombre),
+          description: todos.map((i) => `'${i.nombre}': ${i.descripcion}`).join(" "),
+        },
+        fecha_preferida: {
+          type: ["string", "null"],
+          description:
+            "Fecha en formato YYYY-MM-DD si el cliente mencionó o se puede inferir un día específico (ej. 'jueves', 'mañana', 'el 20'). null si no mencionó ninguna fecha.",
+        },
+        rango_horario_preferido: {
+          type: ["string", "null"],
+          enum: ["manana", "tarde", "noche", null],
+          description:
+            "Franja horaria si el cliente la mencionó explícitamente (ej. 'en la tarde'). null si no aplica.",
+        },
+      },
+      required: ["intent", "fecha_preferida", "rango_horario_preferido"],
+    },
+  };
+}
 
 function construirSystemPromptSolicitud(params: {
   servicioNombre: string;
@@ -81,12 +97,6 @@ function esFechaValida(valor: unknown): valor is string {
   return typeof valor === "string" && /^\d{4}-\d{2}-\d{2}$/.test(valor);
 }
 
-const INTENTS_SOLICITUD: readonly Intent[] = [
-  "consultar_disponibilidad",
-  "consultar_mi_cita",
-  "cancelar",
-  "otro",
-];
 const RANGOS_VALIDOS: readonly RangoHorarioPreferido[] = ["manana", "tarde", "noche"];
 
 /** Interpreta un mensaje nuevo del cliente (sin conversación pendiente). */
@@ -98,14 +108,19 @@ export async function interpretarSolicitud(
     duracionMinutos: number;
     hoyYMD: string;
     diaSemanaHoyTexto: string;
+    // Intents de los módulos activos del negocio (ver src/lib/modulos/) —
+    // 'otro' se agrega siempre y no hace falta incluirlo acá.
+    intentsDisponibles: DescripcionIntent[];
   }
 ): Promise<SolicitudInterpretada> {
+  const nombresValidos = new Set([...params.intentsDisponibles.map((i) => i.nombre), INTENT_OTRO.nombre]);
+
   const respuesta = await client.messages.create({
     model: MODELO_HAIKU,
     max_tokens: 256,
     system: construirSystemPromptSolicitud(params),
     messages: [{ role: "user", content: params.mensajeCliente }],
-    tools: [TOOL_INTERPRETAR_SOLICITUD],
+    tools: [construirToolInterpretarSolicitud(params.intentsDisponibles)],
     tool_choice: { type: "tool", name: "interpretar_solicitud" },
   });
 
@@ -117,9 +132,7 @@ export async function interpretarSolicitud(
   }
 
   const input = bloque.input as Record<string, unknown>;
-  const intent = INTENTS_SOLICITUD.includes(input.intent as Intent)
-    ? (input.intent as Intent)
-    : "otro";
+  const intent = typeof input.intent === "string" && nombresValidos.has(input.intent) ? input.intent : "otro";
   const fechaPreferida = esFechaValida(input.fecha_preferida) && input.fecha_preferida >= params.hoyYMD
     ? input.fecha_preferida
     : null;

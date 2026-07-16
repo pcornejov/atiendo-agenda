@@ -42,16 +42,32 @@ de punta a punta (probado con un negocio de demo). Pendiente:
 1. Parsea el payload de WhatsApp (`src/lib/webhook.ts`) — ignora todo lo que no sea
    un mensaje de texto (confirmaciones de entrega, otros tipos de mensaje, etc.).
 2. Rutea al negocio dueño de ese `phone_number_id`.
-3. Si hay una conversación pendiente (`conversaciones_estado`, ej. "le ofrecí
-   horarios, espero que elija uno"), interpreta la respuesta con
-   `interpretarSeleccion`; si no, interpreta el mensaje como una solicitud nueva con
-   `interpretarSolicitud` (ambas en `src/lib/nlu.ts`, Claude Haiku).
-4. Según la intención: busca disponibilidad y ofrece horarios (guardando el estado
-   pendiente), crea la cita si el cliente eligió una opción (con un re-chequeo de
-   solapamiento justo antes de insertar, `src/lib/reserva.ts`), o cancela la próxima
-   cita activa del cliente.
-5. Responde por WhatsApp (`src/lib/whatsapp.ts`) con el texto correspondiente
-   (`src/lib/mensajes.ts`).
+3. Consulta qué **módulos** tiene activos ese negocio según su plan/suscripción
+   (`negocio_suscripciones` → `planes` → `plan_modulos`, cargado por el
+   [panel de administración](./admin/)). Si no tiene ningún módulo activo
+   (sin plan asignado, o suscripción vencida/cancelada), no responde nada.
+4. Si hay una conversación pendiente (`conversaciones_estado`, con el estado
+   prefijado por el módulo dueño, ej. `agendamiento:esperando_seleccion_horario`),
+   la reanuda ese módulo directamente. Si no, arma la tool de Claude con los
+   intents de todos los módulos activos y la interpreta con `interpretarSolicitud`
+   (`src/lib/nlu.ts`, Claude Haiku), y despacha el intent devuelto al módulo que lo
+   declaró.
+5. Cada módulo (`src/lib/modulos/`) resuelve su propia lógica — hoy solo existe
+   `agendamiento.ts` (agendar/cancelar/consultar una cita, con `interpretarSeleccion`
+   para reanudar la elección de horario y `src/lib/reserva.ts` para el re-chequeo de
+   solapamiento justo antes de insertar) — y responde por WhatsApp
+   (`src/lib/whatsapp.ts`, `src/lib/mensajes.ts`).
+
+Agregar un módulo nuevo (ej. venta de comida) significa: una fila en `modulos`,
+sumarlo en `plan_modulos` para el plan que lo incluya, e implementar
+`DefinicionModulo` (`src/lib/modulos/tipos.ts`) — sin tocar el resto de los
+módulos existentes.
+
+**Importante para dar de alta un negocio a mano** (`seed.sql`, o directo por SQL):
+sin una fila en `negocio_suscripciones` con `estado = 'activa'`, el bot no le
+responde nada — no alcanza con crear el negocio y sus horarios. El
+[panel de administración](./admin/) tiene un botón para activar un plan a mano
+sin pasar por Flow, pensado justo para este caso (pilotos de cortesía).
 
 El cron de recordatorios (`src/lib/recordatorios.ts`, corre cada 5 min) ya hace lo
 mismo del lado de las citas: busca las que empiezan entre 55-65 min desde ahora sin
@@ -230,6 +246,13 @@ Ver [`migrations/0001_init.sql`](./migrations/0001_init.sql). Tablas:
 - **citas** — citas agendadas
 - **conversaciones_estado** — estado de conversación multi-turno (ej. "le ofrecí
   horarios, espero que elija uno"), una fila por `(negocio_id, cliente_telefono)`
+
+[`migrations/0002_saas.sql`](./migrations/0002_saas.sql) suma el schema del panel
+self-service: `usuarios`, `planes`, `modulos`, `plan_modulos`,
+`negocio_suscripciones` (qué módulos tiene activos cada negocio — ver "Cómo
+funciona el flujo conversacional" arriba), y el schema del módulo de venta de
+comida (`menu_items`, `pedidos`, `pedido_items`, todavía sin construir del lado
+del bot). Detalle completo en [`admin/README.md`](./admin/README.md).
 
 El cron de recordatorios corre cada 5 minutos (`wrangler.jsonc`) y busca citas que
 empiezan entre 55-65 minutos desde ahora sin `recordatorio_enviado`.

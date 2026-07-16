@@ -36,7 +36,9 @@ if (Astro.request.method === "POST") {
   if (validacion.ok) {
     const resultado = await crearNegocio(env.DB, validacion.datos);
     if (resultado.ok) {
-      return Astro.redirect(`/negocios/${resultado.id}/horarios`);
+      // A editar, no a horarios: sin un plan asignado ahí el bot no le
+      // responde nada a este negocio todavía (ver arquitectura de módulos).
+      return Astro.redirect(`/negocios/${resultado.id}/editar`);
     }
     errores = [resultado.error];
   } else {
