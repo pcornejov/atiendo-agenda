@@ -1,0 +1,94 @@
+---
+import { env } from "cloudflare:workers";
+import WizardLayout from "../../layouts/WizardLayout.astro";
+import { obtenerNegocio, obtenerPlanPorCodigo, asignarPlanManual } from "../../lib/db.ts";
+
+const usuario = Astro.locals.usuario;
+if (usuario.rol !== "dueno" || !usuario.negocio_id) {
+  return Astro.redirect(usuario.rol === "admin" ? "/admin/negocios" : "/onboarding");
+}
+const negocioId = usuario.negocio_id;
+const negocio = await obtenerNegocio(env.DB, negocioId);
+if (!negocio) return Astro.redirect("/onboarding");
+
+const SERVICIOS = {
+  agenda: { planCodigo: "basico", nombre: "Agenda de horas" },
+  comida: { planCodigo: "nivel2", nombre: "Venta de comida" },
+} as const;
+type ServicioCodigo = keyof typeof SERVICIOS;
+
+const servicioParam = Astro.url.searchParams.get("servicio");
+if (servicioParam !== "agenda" && servicioParam !== "comida") {
+  return Astro.redirect("/onboarding/servicio");
+}
+const servicio: ServicioCodigo = servicioParam;
+
+const plan = await obtenerPlanPorCodigo(env.DB, SERVICIOS[servicio].planCodigo);
+if (!plan) return Astro.redirect("/onboarding/servicio");
+
+let error: string | null = null;
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (String(form.get("_accion") ?? "") === "contratar") {
+    await asignarPlanManual(env.DB, negocioId, plan.id);
+    return Astro.redirect("/onboarding/horarios");
+  }
+  error = "Hubo un problema al procesar tu elección. Intenta de nuevo.";
+}
+---
+
+<WizardLayout title="Precio" paso={3}>
+  <p>
+    Elegiste <strong>{SERVICIOS[servicio].nombre}</strong> para <strong>{negocio.nombre}</strong>.
+  </p>
+
+  {error && <div class="error">{error}</div>}
+
+  <div class="tarjeta-precio">
+    <span class="precio">${plan.precio_mensual_clp.toLocaleString("es-CL")}<small> / mes</small></span>
+    <p>Vigente por 30 días desde la contratación.</p>
+  </div>
+
+  <form method="POST">
+    <input type="hidden" name="_accion" value="contratar" />
+    <button type="submit">Contratar</button>
+  </form>
+
+  <p>
+    <a href="/onboarding/servicio">&larr; Elegir otro servicio</a>
+  </p>
+
+  <p><small>
+    Por ahora el cobro se coordina directamente con nuestro equipo — el pago en línea todavía no
+    está disponible, pero tu plan queda activo de inmediato al contratar.
+  </small></p>
+</WizardLayout>
+
+<style>
+  .tarjeta-precio {
+    padding: 1.25rem 1.5rem;
+    border: 1.5px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface);
+    max-width: 360px;
+    margin-bottom: 1.5rem;
+  }
+  .precio {
+    font-family: var(--font-display);
+    font-size: 2.25rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+  .precio small {
+    font-family: var(--font-body);
+    font-size: 1rem;
+    font-weight: normal;
+    color: var(--ink-muted);
+  }
+  .tarjeta-precio p {
+    margin: 0.4rem 0 0;
+    color: var(--ink-muted);
+    font-size: 0.9rem;
+  }
+</style>

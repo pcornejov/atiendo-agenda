@@ -19,8 +19,6 @@ if (usuario.negocio_id) {
 let errores: string[] = [];
 let valores = {
   nombre: "",
-  servicio_nombre: "",
-  duracion_minutos: "45",
   timezone: "America/Santiago",
 };
 
@@ -28,13 +26,17 @@ if (Astro.request.method === "POST") {
   const form = await Astro.request.formData();
   valores = {
     nombre: String(form.get("nombre") ?? ""),
-    servicio_nombre: String(form.get("servicio_nombre") ?? ""),
-    duracion_minutos: String(form.get("duracion_minutos") ?? ""),
     timezone: String(form.get("timezone") ?? ""),
   };
 
+  // El servicio y su duración se definen más adelante en el wizard (paso de
+  // configuración), una vez que el dueño eligió Agenda o Venta de comida —
+  // acá van con un valor pendiente para no bloquear la creación del negocio.
   const valoresCompletos: NegocioFormValores = {
-    ...valores,
+    nombre: valores.nombre,
+    servicio_nombre: "Pendiente",
+    duracion_minutos: "30",
+    timezone: valores.timezone,
     telefono_whatsapp: `pendiente-${crypto.randomUUID()}`,
     whatsapp_phone_number_id: `pendiente-${crypto.randomUUID()}`,
   };
@@ -44,7 +46,7 @@ if (Astro.request.method === "POST") {
     const resultado = await crearNegocio(env.DB, validacion.datos);
     if (resultado.ok) {
       await vincularUsuarioANegocio(env.DB, usuario.id, resultado.id);
-      return Astro.redirect("/onboarding/horarios");
+      return Astro.redirect("/onboarding/servicio");
     }
     errores = [resultado.error];
   } else {
@@ -54,7 +56,7 @@ if (Astro.request.method === "POST") {
 ---
 
 <WizardLayout title="Crea tu negocio" paso={1}>
-  <p>Cuéntanos sobre tu negocio para configurar tu chatbot de WhatsApp.</p>
+  <p>Cuéntanos cómo se llama tu negocio para empezar a configurar tu chatbot de WhatsApp.</p>
 
   {errores.length > 0 && (
     <div class="error">
@@ -70,22 +72,14 @@ if (Astro.request.method === "POST") {
       <input type="text" name="nombre" value={valores.nombre} required />
     </label>
     <label>
-      Servicio
-      <input type="text" name="servicio_nombre" value={valores.servicio_nombre} required />
-    </label>
-    <label>
-      Duración del servicio (minutos)
-      <input type="number" name="duracion_minutos" value={valores.duracion_minutos} min="1" required />
-    </label>
-    <label>
       Zona horaria (IANA, ej. America/Santiago)
       <input type="text" name="timezone" value={valores.timezone} required />
     </label>
-    <button type="submit">Crear mi negocio</button>
+    <button type="submit">Continuar</button>
   </form>
 
   <p><small>
-    Después de crear tu negocio, nuestro equipo te va a contactar para conectar tu número de
-    WhatsApp — es el único paso que todavía no es automático.
+    Más adelante nuestro equipo te va a contactar para conectar tu número de WhatsApp — es el
+    único paso que todavía no es automático.
   </small></p>
 </WizardLayout>

@@ -1,0 +1,95 @@
+---
+import { env } from "cloudflare:workers";
+import WizardLayout from "../../layouts/WizardLayout.astro";
+import { obtenerNegocio } from "../../lib/db.ts";
+
+const usuario = Astro.locals.usuario;
+if (usuario.rol !== "dueno" || !usuario.negocio_id) {
+  return Astro.redirect(usuario.rol === "admin" ? "/admin/negocios" : "/onboarding");
+}
+const negocio = await obtenerNegocio(env.DB, usuario.negocio_id);
+if (!negocio) return Astro.redirect("/onboarding");
+
+let error: string | null = null;
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  const servicio = String(form.get("servicio") ?? "");
+  if (servicio === "agenda" || servicio === "comida") {
+    return Astro.redirect(`/onboarding/precio?servicio=${servicio}`);
+  }
+  error = "Elige uno de los dos servicios para continuar.";
+}
+---
+
+<WizardLayout title="Elige tu servicio" paso={2}>
+  <p>
+    ¿Qué necesita <strong>{negocio.nombre}</strong>? Puedes cambiarlo más adelante hablando con
+    nuestro equipo.
+  </p>
+
+  {error && <div class="error">{error}</div>}
+
+  <form method="POST" class="tarjetas-servicio">
+    <label class="tarjeta-servicio">
+      <input type="radio" name="servicio" value="agenda" required />
+      <div>
+        <h3>Agenda de horas</h3>
+        <p>
+          Tus clientes reservan, consultan y cancelan horas por WhatsApp, sin llamadas ni idas y
+          vueltas.
+        </p>
+      </div>
+    </label>
+    <label class="tarjeta-servicio">
+      <input type="radio" name="servicio" value="comida" />
+      <div>
+        <h3>Venta de comida</h3>
+        <p>
+          Tus clientes ven la carta y hacen pedidos por WhatsApp, con retiro o despacho.
+        </p>
+      </div>
+    </label>
+    <button type="submit">Continuar</button>
+  </form>
+</WizardLayout>
+
+<style>
+  .tarjetas-servicio {
+    display: grid;
+    gap: 1rem;
+    max-width: 560px;
+  }
+  .tarjeta-servicio {
+    display: flex;
+    gap: 0.85rem;
+    align-items: flex-start;
+    padding: 1rem 1.15rem;
+    border: 1.5px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface);
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  .tarjeta-servicio:hover {
+    border-color: var(--ink-muted);
+  }
+  .tarjeta-servicio:has(input:checked) {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  }
+  .tarjeta-servicio input[type="radio"] {
+    margin-top: 0.3rem;
+    accent-color: var(--accent);
+    flex-shrink: 0;
+  }
+  .tarjeta-servicio h3 {
+    font-size: 1.05rem;
+    margin: 0 0 0.3rem;
+  }
+  .tarjeta-servicio p {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--ink-muted);
+  }
+</style>

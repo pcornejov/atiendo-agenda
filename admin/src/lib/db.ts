@@ -336,6 +336,20 @@ export async function obtenerNegocioIdPorFlowCustomerId(db: D1Database, flowCust
   return fila?.negocio_id ?? null;
 }
 
+/** Código del plan activo de un negocio (ej. 'basico', 'nivel2'), o null si todavía no tiene suscripción. */
+export async function obtenerCodigoPlanDelNegocio(db: D1Database, negocioId: number): Promise<string | null> {
+  const fila = await db
+    .prepare(
+      `SELECT p.codigo AS codigo
+       FROM negocio_suscripciones s
+       JOIN planes p ON p.id = s.plan_id
+       WHERE s.negocio_id = ?`
+    )
+    .bind(negocioId)
+    .first<{ codigo: string }>();
+  return fila?.codigo ?? null;
+}
+
 /** Mismo cálculo que usa el bot (src/lib/flujo.ts) para saber qué módulos ofrecerle a un negocio. */
 export async function listarCodigosModulosActivos(db: D1Database, negocioId: number): Promise<string[]> {
   const resultado = await db
