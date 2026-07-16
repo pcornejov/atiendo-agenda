@@ -8,12 +8,15 @@ Cloudflare Workers separado (Astro + adapter de Cloudflare), que comparte la
 misma base D1 que el bot (`../wrangler.jsonc`) — no importa código del bot,
 solo apunta al mismo `database_id`.
 
-**Estado actual**: login y autorización por rol ya están construidos. La
-parte de **cobro automático (Flow)** y la **arquitectura de módulos del bot**
-(que el plan de cada negocio determine qué puede responder su chatbot —
-agendamiento, venta de comida) todavía no están conectadas: hoy el bot sigue
-respondiendo exactamente igual que antes de este cambio (solo agendamiento),
-sin importar lo que diga `negocio_suscripciones`. Ver "Qué falta" más abajo.
+**Estado actual**: login, autorización por rol, y la integración con Flow
+(selección de plan, alta de cliente y registro de tarjeta, webhook de
+confirmación) ya están construidos — ver advertencia sobre Flow más abajo, no
+está probado contra una cuenta sandbox real todavía. La **arquitectura de
+módulos del bot** (que el plan de cada negocio determine qué puede responder
+su chatbot — agendamiento, venta de comida) todavía no está conectada: hoy
+el bot sigue respondiendo exactamente igual que antes de este cambio (solo
+agendamiento), sin importar el plan/estado de `negocio_suscripciones`. Ver
+"Qué falta" más abajo.
 
 ## Setup local
 
@@ -35,9 +38,9 @@ Abre `http://localhost:4321/` — redirige a `/auth/login`.
 ## Login con Google
 
 El panel ya no usa Cloudflare Access — el login es una cuenta de Google real,
-para que cualquier dueño de negocio se pueda registrar sin que vos tengas que
-darlo de alta a mano en un dashboard. Para que funcione hace falta un OAuth
-Client de Google:
+para que cualquier dueño de negocio se pueda registrar sin que el
+administrador tenga que darlo de alta a mano en un dashboard. Para que
+funcione hace falta un OAuth Client de Google:
 
 1. Entra a [Google Cloud Console](https://console.cloud.google.com/) → crea
    un proyecto (o usa uno existente) → **APIs & Services** → **Credentials**
@@ -69,6 +72,49 @@ La verificación del `id_token` de Google se hace contra el endpoint
 `tokeninfo` de Google (`src/lib/auth.ts`) en vez de validar la firma JWT
 nosotros mismos — más simple y sin depender de una librería de JWT/JWKS solo
 para este uso.
+
+## Cobro con Flow
+
+**Advertencia**: esto se escribió a partir de la documentación pública
+resumida de `developers.flow.cl`, sin acceso a una cuenta sandbox real para
+probarlo. La firma HMAC-SHA256 (`src/lib/flow.ts` → `firmarParametros`) está
+confirmada por la documentación y tiene tests. Los nombres exactos de los
+campos de cada endpoint (`crearPlanFlow`, `crearClienteFlow`,
+`urlRegistroTarjeta`, `crearSuscripcionFlow`, `obtenerEstadoPorToken` — todos
+en `src/lib/flow.ts`) están marcados con comentarios `VERIFICAR` y hay que
+confirmarlos/ajustarlos la primera vez que se prueba contra el sandbox de
+verdad. El webhook (`src/pages/webhook/flow.ts`) sigue el patrón documentado
+de "no confiar en el POST entrante, consultar el estado real con el token" —
+es la única fuente de verdad de cuándo una suscripción pasa a `'activa'`.
+
+Para activarlo:
+
+1. Crear una cuenta en [Flow](https://www.flow.cl/) (sandbox primero:
+   `https://sandbox.flow.cl`) y conseguir `apiKey`/`secretKey`.
+2. `apiKey` y `baseUrl` van en `wrangler.jsonc` → `vars` (`FLOW_API_KEY`,
+   `FLOW_BASE_URL` — dejar `https://sandbox.flow.cl/api` mientras se prueba).
+3. `secretKey` es secreto:
+   ```bash
+   npx wrangler secret put FLOW_SECRET_KEY          # producción
+   echo "FLOW_SECRET_KEY=tu-secreto-aca" >> .dev.vars # local
+   ```
+4. Configurar en el dashboard de Flow la `urlConfirmation` apuntando a
+   `https://atiendo-agenda-admin.<tu-subdominio>.workers.dev/webhook/flow`.
+5. Dar de alta los planes en Flow una sola vez y guardar el `flow_plan_id`
+   resultante en la tabla `planes` (ver `scripts/crear-planes-flow.ts`):
+   ```bash
+   FLOW_API_KEY=... FLOW_SECRET_KEY=... FLOW_BASE_URL=https://sandbox.flow.cl/api \
+     node --experimental-strip-types scripts/crear-planes-flow.ts
+   ```
+
+El flujo de alta de un negocio nuevo (`src/pages/onboarding/plan.astro`)
+elige plan → crea el cliente en Flow → redirige a la página de Flow para
+registrar la tarjeta, con `urlReturn` de vuelta a `/negocios/[id]/editar`.
+**No** construimos el paso de asociar el cliente ya con tarjeta al plan
+(`crearSuscripcionFlow`) en esa redirección de vuelta — no hay forma de
+confirmar sin una cuenta real qué manda Flow en esa redirección (si manda
+algún parámetro de confirmación, o nada). Queda pendiente para cuando haya
+acceso a un sandbox real para probarlo.
 
 ## Deploy
 
@@ -110,6 +156,12 @@ npm run typecheck   # astro check
   limitación abajo) — quedan con un valor "pendiente" hasta que el equipo de
   Atiendo Agenda los conecta desde `/negocios/[id]/editar` (solo `admin`
   puede editar ese campo — un `dueno` lo ve de solo lectura).
+- `src/pages/onboarding/plan.astro` — elegir plan y arrancar el registro de
+  tarjeta en Flow, después de crear el negocio.
+- `src/lib/flow.ts` — firma HMAC-SHA256 y llamadas a la API de Flow (ver
+  advertencia en la sección "Cobro con Flow" más abajo).
+- `src/pages/webhook/flow.ts` — recibe el token de confirmación de Flow y
+  actualiza `negocio_suscripciones`.
 - `src/pages/admin/negocios/` — listado de **todos** los negocios con su plan/
   estado de suscripción, uso exclusivo de `rol = 'admin'`. Reemplaza a la
   vieja `/negocios` (que listaba todo sin distinguir roles).
@@ -129,9 +181,9 @@ no está construida todavía.
 
 ## Qué falta (fuera del alcance de esta etapa)
 
-- **Cobro automático con Flow**: hoy `negocio_suscripciones` existe en el
-  schema pero nada la escribe todavía — el plan de un negocio se asigna a
-  mano en la base mientras se construye la integración real.
+- **Verificar Flow contra una cuenta sandbox real** (ver advertencia arriba)
+  y construir el paso de `crearSuscripcionFlow` en el retorno del registro de
+  tarjeta.
 - **Arquitectura de módulos del bot**: `nlu.ts`/`flujo.ts` (en el repo del
   bot) todavía no consultan `negocio_suscripciones`/`plan_modulos` — todo
   negocio sigue teniendo el comportamiento actual de agendamiento sin

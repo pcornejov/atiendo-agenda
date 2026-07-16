@@ -44,7 +44,7 @@ if (Astro.request.method === "POST") {
     const resultado = await crearNegocio(env.DB, validacion.datos);
     if (resultado.ok) {
       await vincularUsuarioANegocio(env.DB, usuario.id, resultado.id);
-      return Astro.redirect(`/negocios/${resultado.id}/horarios`);
+      return Astro.redirect("/onboarding/plan");
     }
     errores = [resultado.error];
   } else {

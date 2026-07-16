@@ -13,5 +13,6 @@ declare namespace App {
 declare namespace Cloudflare {
   interface Env {
     GOOGLE_CLIENT_SECRET: string;
+    FLOW_SECRET_KEY: string;
   }
 }

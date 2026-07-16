@@ -24,6 +24,11 @@
   // que inicia sesión; el resto de las cuentas nuevas quedan como 'dueno'.
   "vars": {
     "GOOGLE_CLIENT_ID": "",
-    "ADMIN_EMAIL": "pablo.cornejo.v@gmail.com"
+    "ADMIN_EMAIL": "pablo.cornejo.v@gmail.com",
+    // FLOW_API_KEY y FLOW_BASE_URL no son secretos. FLOW_SECRET_KEY sí lo es
+    // — `wrangler secret put FLOW_SECRET_KEY` en prod, `.dev.vars` en local.
+    // FLOW_BASE_URL: sandbox mientras no haya cuenta de producción de Flow.
+    "FLOW_API_KEY": "",
+    "FLOW_BASE_URL": "https://sandbox.flow.cl/api"
   }
 }

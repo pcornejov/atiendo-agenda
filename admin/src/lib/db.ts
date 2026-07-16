@@ -224,3 +224,95 @@ export async function crearUsuario(
 export async function vincularUsuarioANegocio(db: D1Database, usuarioId: number, negocioId: number): Promise<void> {
   await db.prepare("UPDATE usuarios SET negocio_id = ? WHERE id = ?").bind(negocioId, usuarioId).run();
 }
+
+export interface Plan {
+  id: number;
+  codigo: string;
+  nombre: string;
+  precio_mensual_clp: number;
+  flow_plan_id: string | null;
+  activo: number;
+}
+
+export async function listarPlanesActivos(db: D1Database): Promise<Plan[]> {
+  const resultado = await db.prepare("SELECT * FROM planes WHERE activo = 1 ORDER BY precio_mensual_clp").all<Plan>();
+  return resultado.results;
+}
+
+export async function obtenerPlanPorCodigo(db: D1Database, codigo: string): Promise<Plan | null> {
+  const plan = await db.prepare("SELECT * FROM planes WHERE codigo = ?").bind(codigo).first<Plan>();
+  return plan ?? null;
+}
+
+export type EstadoSuscripcion = "pendiente_pago" | "activa" | "vencida" | "cancelada";
+
+export interface Suscripcion {
+  negocio_id: number;
+  plan_id: number;
+  estado: EstadoSuscripcion;
+  flow_customer_id: string | null;
+  flow_subscription_id: string | null;
+  proxima_facturacion: string | null;
+  updated_at: string;
+}
+
+export async function obtenerSuscripcion(db: D1Database, negocioId: number): Promise<Suscripcion | null> {
+  const suscripcion = await db
+    .prepare("SELECT * FROM negocio_suscripciones WHERE negocio_id = ?")
+    .bind(negocioId)
+    .first<Suscripcion>();
+  return suscripcion ?? null;
+}
+
+/** Crea la suscripción de un negocio recién onboardeado, en estado 'pendiente_pago' hasta que Flow confirme la tarjeta. */
+export async function crearSuscripcionPendiente(db: D1Database, negocioId: number, planId: number): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO negocio_suscripciones (negocio_id, plan_id, estado)
+       VALUES (?, ?, 'pendiente_pago')`
+    )
+    .bind(negocioId, planId)
+    .run();
+}
+
+export async function guardarClienteFlow(db: D1Database, negocioId: number, flowCustomerId: string): Promise<void> {
+  await db
+    .prepare("UPDATE negocio_suscripciones SET flow_customer_id = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE negocio_id = ?")
+    .bind(flowCustomerId, negocioId)
+    .run();
+}
+
+export async function activarSuscripcion(
+  db: D1Database,
+  negocioId: number,
+  params: { flowSubscriptionId: string; proximaFacturacion: string | null }
+): Promise<void> {
+  await db
+    .prepare(
+      `UPDATE negocio_suscripciones
+       SET estado = 'activa', flow_subscription_id = ?, proxima_facturacion = ?,
+           updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+       WHERE negocio_id = ?`
+    )
+    .bind(params.flowSubscriptionId, params.proximaFacturacion, negocioId)
+    .run();
+}
+
+export async function marcarSuscripcionVencida(db: D1Database, negocioId: number): Promise<void> {
+  await db
+    .prepare(
+      `UPDATE negocio_suscripciones SET estado = 'vencida', updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+       WHERE negocio_id = ?`
+    )
+    .bind(negocioId)
+    .run();
+}
+
+/** Busca el negocio dueño de un flow_customer_id — usado por el webhook, que solo recibe el token de Flow. */
+export async function obtenerNegocioIdPorFlowCustomerId(db: D1Database, flowCustomerId: string): Promise<number | null> {
+  const fila = await db
+    .prepare("SELECT negocio_id FROM negocio_suscripciones WHERE flow_customer_id = ?")
+    .bind(flowCustomerId)
+    .first<{ negocio_id: number }>();
+  return fila?.negocio_id ?? null;
+}

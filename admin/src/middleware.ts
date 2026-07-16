@@ -7,7 +7,9 @@ import { defineMiddleware } from "astro:middleware";
 import { env } from "cloudflare:workers";
 import { obtenerUsuarioPorId } from "./lib/db.ts";
 
-const RUTAS_PUBLICAS = new Set(["/auth/login", "/auth/callback"]);
+// /webhook/flow lo llama Flow directamente (no tiene sesión de Google) — se
+// autentica solo, verificando el token contra la API de Flow, no acá.
+const RUTAS_PUBLICAS = new Set(["/auth/login", "/auth/callback", "/webhook/flow"]);
 
 export const onRequest = defineMiddleware(async (context, next) => {
   if (RUTAS_PUBLICAS.has(context.url.pathname)) {

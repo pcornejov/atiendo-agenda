@@ -1,0 +1,75 @@
+---
+// Selección de plan + inicio del registro de tarjeta en Flow. La creación de
+// la suscripción en sí (Flow /subscription/create, que asocia el cliente ya
+// con tarjeta al plan) queda PENDIENTE de construir: depende del contrato
+// exacto de la redirección de vuelta de Flow después de /customer/register
+// (qué parámetros manda, si manda algo) — no hay forma de confirmarlo sin
+// una cuenta sandbox real. Hasta entonces, el negocio queda en
+// 'pendiente_pago' y el webhook (../../pages/webhook/flow.ts, que sí es un
+// mecanismo confiable — no depende de esta redirección) es la única fuente
+// de verdad de cuándo la suscripción pasa a 'activa'.
+import { env } from "cloudflare:workers";
+import Layout from "../../layouts/Layout.astro";
+import { listarPlanesActivos, obtenerNegocio, crearSuscripcionPendiente, guardarClienteFlow } from "../../lib/db.ts";
+import { crearClienteFlow as crearClienteFlowApi, urlRegistroTarjeta as urlRegistroTarjetaApi } from "../../lib/flow.ts";
+
+const usuario = Astro.locals.usuario;
+if (!usuario.negocio_id) {
+  return Astro.redirect("/onboarding");
+}
+const negocio = await obtenerNegocio(env.DB, usuario.negocio_id);
+if (!negocio) {
+  return Astro.redirect("/onboarding");
+}
+
+const planes = await listarPlanesActivos(env.DB);
+let error: string | null = null;
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  const planId = Number(form.get("plan_id"));
+  const plan = planes.find((p) => p.id === planId);
+
+  if (!plan) {
+    error = "Elige un plan válido.";
+  } else {
+    await crearSuscripcionPendiente(env.DB, negocio.id, plan.id);
+
+    const credenciales = { apiKey: env.FLOW_API_KEY, secretKey: env.FLOW_SECRET_KEY, baseUrl: env.FLOW_BASE_URL };
+    try {
+      const { customerId } = await crearClienteFlowApi(credenciales, {
+        email: usuario.email,
+        name: negocio.nombre,
+        externalId: String(negocio.id),
+      });
+      await guardarClienteFlow(env.DB, negocio.id, customerId);
+
+      const urlTarjeta = await urlRegistroTarjetaApi(credenciales, {
+        customerId,
+        urlReturn: `${Astro.url.origin}/negocios/${negocio.id}/editar`,
+      });
+      return Astro.redirect(urlTarjeta);
+    } catch (e) {
+      console.error("Error iniciando el registro de pago en Flow:", e);
+      error = "No pudimos conectar con la pasarela de pago. Intenta de nuevo en unos minutos.";
+    }
+  }
+}
+---
+
+<Layout title="Elige tu plan">
+  <p>Elige el plan de <strong>{negocio.nombre}</strong>:</p>
+
+  {error && <div class="error">{error}</div>}
+
+  <form method="POST" class="form-grid">
+    {planes.map((p) => (
+      <label style="font-weight: normal;">
+        <input type="radio" name="plan_id" value={p.id} required />
+        {" "}<strong>{p.nombre}</strong>
+        {p.precio_mensual_clp > 0 ? ` — $${p.precio_mensual_clp.toLocaleString("es-CL")}/mes` : " — precio a definir"}
+      </label>
+    ))}
+    <button type="submit">Continuar al pago</button>
+  </form>
+</Layout>
