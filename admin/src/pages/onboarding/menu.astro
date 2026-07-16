@@ -55,8 +55,9 @@ const menu = await listarMenu(env.DB, negocioId);
 
 <WizardLayout title="Menú" paso={5}>
   <p>
-    Este paso es opcional — si <strong>{negocio.nombre}</strong> no vende comida, puedes continuar
-    directamente al siguiente paso.
+    Carga la carta de <strong>{negocio.nombre}</strong> — puedes subir una foto, un PDF o un
+    Excel, o agregar los ítems uno por uno. Si prefieres, también puedes completar esto más
+    tarde y seguir con la configuración.
   </p>
 
   {error && <div class="error">{error}</div>}

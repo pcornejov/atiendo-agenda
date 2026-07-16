@@ -10,7 +10,7 @@ export const GET: APIRoute = async ({ url, cookies, redirect, session }) => {
   cookies.delete("google_oauth_state", { path: "/" });
 
   if (!code || !state || !estadoCookie || state !== estadoCookie) {
-    return new Response("Solicitud de login inválida o expirada. Volvé a intentar.", { status: 400 });
+    return new Response("Solicitud de login inválida o expirada. Vuelve a intentar.", { status: 400 });
   }
 
   let identidad;
@@ -23,7 +23,7 @@ export const GET: APIRoute = async ({ url, cookies, redirect, session }) => {
     });
   } catch (error) {
     console.error("Error en login con Google:", error);
-    return new Response("No se pudo verificar tu cuenta de Google. Volvé a intentar.", { status: 401 });
+    return new Response("No se pudo verificar tu cuenta de Google. Vuelve a intentar.", { status: 401 });
   }
 
   let usuario = await obtenerUsuarioPorGoogleSub(env.DB, identidad.sub);
