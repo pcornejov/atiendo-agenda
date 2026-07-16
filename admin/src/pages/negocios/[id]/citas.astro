@@ -3,12 +3,19 @@ import { env } from "cloudflare:workers";
 import Layout from "../../../layouts/Layout.astro";
 import { obtenerNegocio, listarCitasProximas, cancelarCitaPorId } from "../../../lib/db.ts";
 import { utcToZonedTexto } from "../../../lib/tz.ts";
+import { puedeAdministrarNegocio } from "../../../lib/autorizacion.ts";
 
+const usuario = Astro.locals.usuario;
 const negocioId = Number(Astro.params.id);
+if (!puedeAdministrarNegocio(usuario, negocioId)) {
+  return new Response("No autorizado", { status: 403 });
+}
+
 const negocio = await obtenerNegocio(env.DB, negocioId);
 if (!negocio) {
   return new Response("Negocio no encontrado", { status: 404 });
 }
+const volverUrl = usuario.rol === "admin" ? "/admin/negocios" : `/negocios/${negocioId}/editar`;
 
 if (Astro.request.method === "POST") {
   const form = await Astro.request.formData();
@@ -21,7 +28,7 @@ const citas = await listarCitasProximas(env.DB, negocioId);
 ---
 
 <Layout title={`Citas — ${negocio.nombre}`}>
-  <p><a href="/negocios">&larr; Volver a negocios</a></p>
+  <p><a href={volverUrl}>&larr; Volver</a></p>
 
   {citas.length === 0 && <p>No hay citas próximas para este negocio.</p>}
 

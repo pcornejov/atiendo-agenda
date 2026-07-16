@@ -5,6 +5,12 @@ import NegocioForm from "../../components/NegocioForm.astro";
 import { crearNegocio } from "../../lib/db.ts";
 import { validarNegocioForm, type NegocioFormValores } from "../../lib/validacion.ts";
 
+// Alta manual de un piloto por el administrador. El alta self-service de un
+// dueño de negocio pasa por /onboarding, no por acá.
+if (Astro.locals.usuario.rol !== "admin") {
+  return new Response("No autorizado", { status: 403 });
+}
+
 let errores: string[] = [];
 let valores: NegocioFormValores = {
   nombre: "",

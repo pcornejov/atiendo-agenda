@@ -4,13 +4,20 @@ import Layout from "../../../layouts/Layout.astro";
 import NegocioForm from "../../../components/NegocioForm.astro";
 import { obtenerNegocio, actualizarNegocio } from "../../../lib/db.ts";
 import { validarNegocioForm, type NegocioFormValores } from "../../../lib/validacion.ts";
+import { puedeAdministrarNegocio } from "../../../lib/autorizacion.ts";
 
+const usuario = Astro.locals.usuario;
 const negocioId = Number(Astro.params.id);
+if (!puedeAdministrarNegocio(usuario, negocioId)) {
+  return new Response("No autorizado", { status: 403 });
+}
+
 const negocioExistente = await obtenerNegocio(env.DB, negocioId);
 if (!negocioExistente) {
   return new Response("Negocio no encontrado", { status: 404 });
 }
 
+const bloquearWhatsapp = usuario.rol !== "admin";
 let errores: string[] = [];
 let valores: NegocioFormValores = {
   nombre: negocioExistente.nombre,
@@ -32,11 +39,18 @@ if (Astro.request.method === "POST") {
     timezone: String(form.get("timezone") ?? ""),
   };
 
+  // Un dueño de negocio no puede cambiar su propio whatsapp_phone_number_id
+  // desde el formulario (readonly en la UI) — se refuerza acá server-side,
+  // por si alguien arma el POST a mano.
+  if (bloquearWhatsapp) {
+    valores.whatsapp_phone_number_id = negocioExistente.whatsapp_phone_number_id;
+  }
+
   const validacion = validarNegocioForm(valores);
   if (validacion.ok) {
     const resultado = await actualizarNegocio(env.DB, negocioId, validacion.datos);
     if (resultado.ok) {
-      return Astro.redirect("/negocios");
+      return Astro.redirect(usuario.rol === "admin" ? "/admin/negocios" : `/negocios/${negocioId}/editar`);
     }
     errores = [resultado.error];
   } else {
@@ -46,5 +60,5 @@ if (Astro.request.method === "POST") {
 ---
 
 <Layout title={`Editar — ${negocioExistente.nombre}`}>
-  <NegocioForm valores={valores} errores={errores} textoBoton="Guardar cambios" />
+  <NegocioForm valores={valores} errores={errores} textoBoton="Guardar cambios" bloquearWhatsapp={bloquearWhatsapp} />
 </Layout>

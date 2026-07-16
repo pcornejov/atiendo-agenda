@@ -14,5 +14,16 @@
       "database_id": "837af49b-9d1c-4e1d-81f5-6bd26fde96de",
       "migrations_dir": "../migrations"
     }
-  ]
+  ],
+
+  // Login con Google (ver README): GOOGLE_CLIENT_ID no es secreto (viaja en la
+  // URL de autorización igual). GOOGLE_CLIENT_SECRET sí es secreto — se
+  // configura con `wrangler secret put GOOGLE_CLIENT_SECRET` en prod y en
+  // `.dev.vars` en local, no acá. ADMIN_EMAIL decide qué cuenta de Google
+  // recibe el rol 'admin' (dueño único de todos los negocios) la primera vez
+  // que inicia sesión; el resto de las cuentas nuevas quedan como 'dueno'.
+  "vars": {
+    "GOOGLE_CLIENT_ID": "",
+    "ADMIN_EMAIL": "pablo.cornejo.v@gmail.com"
+  }
 }

@@ -1,13 +1,19 @@
 # atiendo-agenda-admin
 
-Panel de administración para cargar y editar negocios piloto, sin tener que
-correr SQL a mano. Proyecto de Cloudflare Workers separado (Astro + adapter de
-Cloudflare), que comparte la misma base D1 que el bot (`../wrangler.jsonc`) —
-no importa código del bot, solo apunta al mismo `database_id`.
+Panel de administración de Atiendo Agenda: registro y login self-service con
+Google para que cada dueño de negocio administre su propio negocio (horarios,
+citas), y una vista de administrador (`/admin/negocios`) para el equipo de
+Atiendo Agenda con todos los negocios y su plan/suscripción. Proyecto de
+Cloudflare Workers separado (Astro + adapter de Cloudflare), que comparte la
+misma base D1 que el bot (`../wrangler.jsonc`) — no importa código del bot,
+solo apunta al mismo `database_id`.
 
-**Fase 1**: sin login propio en el código — se protege con **Cloudflare
-Access** a nivel de borde (ver más abajo), restringido a tu email. No hay
-registro de negocios por su cuenta todavía; eso es Fase 2 (autogestionado).
+**Estado actual**: login y autorización por rol ya están construidos. La
+parte de **cobro automático (Flow)** y la **arquitectura de módulos del bot**
+(que el plan de cada negocio determine qué puede responder su chatbot —
+agendamiento, venta de comida) todavía no están conectadas: hoy el bot sigue
+respondiendo exactamente igual que antes de este cambio (solo agendamiento),
+sin importar lo que diga `negocio_suscripciones`. Ver "Qué falta" más abajo.
 
 ## Setup local
 
@@ -24,7 +30,45 @@ npx wrangler d1 execute atiendo-agenda-db --local --file=../seed.sql
 npm run dev
 ```
 
-Abre `http://localhost:4321/negocios`.
+Abre `http://localhost:4321/` — redirige a `/auth/login`.
+
+## Login con Google
+
+El panel ya no usa Cloudflare Access — el login es una cuenta de Google real,
+para que cualquier dueño de negocio se pueda registrar sin que vos tengas que
+darlo de alta a mano en un dashboard. Para que funcione hace falta un OAuth
+Client de Google:
+
+1. Entra a [Google Cloud Console](https://console.cloud.google.com/) → crea
+   un proyecto (o usa uno existente) → **APIs & Services** → **Credentials**
+   → **Create Credentials** → **OAuth client ID** → tipo **Web application**.
+2. En **Authorized redirect URIs** agrega:
+   - `http://localhost:4321/auth/callback` (para desarrollo local)
+   - `https://atiendo-agenda-admin.<tu-subdominio>.workers.dev/auth/callback`
+     (producción, una vez desplegado)
+3. Copia el **Client ID** y el **Client secret** que te da Google.
+4. Client ID (no es secreto, va en `wrangler.jsonc` → `vars.GOOGLE_CLIENT_ID`):
+   ```bash
+   # editar wrangler.jsonc a mano, o
+   npx wrangler types   # después de editarlo, para regenerar los tipos
+   ```
+5. Client secret (sí es secreto):
+   ```bash
+   # producción
+   npx wrangler secret put GOOGLE_CLIENT_SECRET
+
+   # local — crear admin/.dev.vars (gitignored) con:
+   echo "GOOGLE_CLIENT_SECRET=tu-secreto-aca" > .dev.vars
+   ```
+6. `ADMIN_EMAIL` (en `wrangler.jsonc` → `vars`) decide qué cuenta de Google
+   recibe el rol `admin` (ve y administra todos los negocios) la primera vez
+   que inicia sesión — el resto de las cuentas nuevas quedan como `dueno` de
+   su propio negocio.
+
+La verificación del `id_token` de Google se hace contra el endpoint
+`tokeninfo` de Google (`src/lib/auth.ts`) en vez de validar la firma JWT
+nosotros mismos — más simple y sin depender de una librería de JWT/JWKS solo
+para este uso.
 
 ## Deploy
 
@@ -35,47 +79,65 @@ npm run deploy
 Esto publica un Worker nuevo (`atiendo-agenda-admin`), separado del bot, en
 `https://atiendo-agenda-admin.<tu-subdominio>.workers.dev`.
 
-## Proteger el panel con Cloudflare Access
-
-El código no tiene autenticación propia — la protección se configura en el
-dashboard de Cloudflare, fuera de este repo:
-
-1. Entra a [Cloudflare Zero Trust](https://one.dash.cloudflare.com/) (gratis
-   hasta 50 usuarios).
-2. **Access** → **Applications** → **Add an application** → **Self-hosted**.
-3. Dominio: el subdominio `.workers.dev` donde quedó publicado este Worker.
-4. Política: **Allow**, regla **Emails** → tu email únicamente.
-5. Guardar.
-
-Con esto, cualquiera que entre a la URL del panel tiene que loguearse con ese
-email antes de llegar al código — sin tocar una línea de este repo.
-
-**Recomendado además:** agregar `/interno/*` del Worker del bot
-(`atiendo-agenda`, no este panel) a la misma aplicación de Access — hoy esas
-rutas de debug están sin autenticación en producción.
+**Recomendado además:** seguir protegiendo `/interno/*` del Worker del bot
+(`atiendo-agenda`, no este panel) con Cloudflare Access o similar — hoy esas
+rutas de debug están sin autenticación en producción; ese Worker no tiene
+login propio.
 
 ## Tests
 
 ```bash
-npm run test       # funciones puras (validaciones)
+npm run test        # funciones puras (validaciones, armado de URL de Google)
 npm run typecheck   # astro check
 ```
 
 ## Estructura
 
 - `src/lib/db.ts` — todas las consultas D1, cada función recibe `negocioId`
-  explícito (para que agregar autorización por negocio en Fase 2 sea un
-  chequeo, no un rediseño).
-- `src/lib/validacion.ts` — validación de formularios, pura y testeada.
-- `src/pages/negocios/` — listado, alta, edición, horarios y citas por
-  negocio.
+  explícito.
+- `src/lib/auth.ts` — login con Google (armado de URL de autorización,
+  intercambio de código + verificación del id_token).
+- `src/lib/autorizacion.ts` — `puedeAdministrarNegocio(usuario, negocioId)`:
+  un `admin` administra cualquier negocio, un `dueno` solo el suyo.
+- `src/middleware.ts` — único gate de autenticación: exige sesión de Google
+  válida en toda ruta salvo `/auth/*`, cuelga `Astro.locals.usuario`, y manda
+  a `/onboarding` a un `dueno` que todavía no tiene negocio creado.
+- `src/pages/auth/` — `login.ts` (redirige a Google), `callback.ts`
+  (intercambia el código, crea o encuentra el usuario, arma la sesión),
+  `logout.ts`.
+- `src/pages/onboarding.astro` — alta self-service del negocio de un `dueno`
+  nuevo. El teléfono/Phone Number ID de WhatsApp reales NO se piden acá (ver
+  limitación abajo) — quedan con un valor "pendiente" hasta que el equipo de
+  Atiendo Agenda los conecta desde `/negocios/[id]/editar` (solo `admin`
+  puede editar ese campo — un `dueno` lo ve de solo lectura).
+- `src/pages/admin/negocios/` — listado de **todos** los negocios con su plan/
+  estado de suscripción, uso exclusivo de `rol = 'admin'`. Reemplaza a la
+  vieja `/negocios` (que listaba todo sin distinguir roles).
+- `src/pages/negocios/[id]/` — editar, horarios, citas: scoped por
+  `negocioId`, con `puedeAdministrarNegocio` chequeado en cada página (no solo
+  ocultando el link en la navegación — la URL es adivinable).
 
-## Qué falta para Fase 2 (autogestionado, no construido acá)
+## Limitación real: el número de WhatsApp sigue siendo manual
 
-- Login real por negocio (probablemente magic-link por email, dado el
-  perfil no técnico de los dueños de negocio).
-- Columna `negocios.email` (o tabla separada) para mapear una identidad
-  autenticada a su `negocio_id`.
-- La pantalla `/negocios` (que hoy lista *todos* los negocios) es
-  explícitamente de uso exclusivo del administrador — en Fase 2 no debería
-  existir para un dueño de negocio individual, o debería mostrar solo el suyo.
+Aunque el registro, login y configuración del negocio ya son self-service,
+**conectar el número de WhatsApp de cada negocio nuevo todavía requiere un
+paso manual** del equipo de Atiendo Agenda en Meta Business Manager (alta de
+la app, verificación del WABA, etc. — ver `../README.md`). La integración de
+["WhatsApp Embedded Signup"](https://developers.facebook.com/docs/whatsapp/embedded-signup)
+de Meta permitiría que el propio dueño conecte su cuenta desde esta web, pero
+no está construida todavía.
+
+## Qué falta (fuera del alcance de esta etapa)
+
+- **Cobro automático con Flow**: hoy `negocio_suscripciones` existe en el
+  schema pero nada la escribe todavía — el plan de un negocio se asigna a
+  mano en la base mientras se construye la integración real.
+- **Arquitectura de módulos del bot**: `nlu.ts`/`flujo.ts` (en el repo del
+  bot) todavía no consultan `negocio_suscripciones`/`plan_modulos` — todo
+  negocio sigue teniendo el comportamiento actual de agendamiento sin
+  importar su plan. Es decir: la idea original de "autogestionar qué puede
+  responder tu chatbot" todavía no está conectada de punta a punta.
+- **Módulo de venta de comida (Nivel 2)**: el schema (`menu_items`, `pedidos`,
+  `pedido_items`) ya existe, pero no hay intents de NLU ni pantallas de admin
+  todavía.
+- **WhatsApp Embedded Signup**, y **Nivel 3** (sin definir).

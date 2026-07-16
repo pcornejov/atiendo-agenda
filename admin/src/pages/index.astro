@@ -1,3 +1,4 @@
 ---
-return Astro.redirect("/negocios");
+const usuario = Astro.locals.usuario;
+return Astro.redirect(usuario.rol === "admin" ? "/admin/negocios" : `/negocios/${usuario.negocio_id}/editar`);
 ---

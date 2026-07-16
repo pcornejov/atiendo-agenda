@@ -1,8 +1,11 @@
 ---
+import type { Usuario } from "../lib/db.ts";
+
 interface Props {
   title: string;
 }
 const { title } = Astro.props;
+const usuario: Usuario | undefined = Astro.locals.usuario;
 ---
 
 <html lang="es">
@@ -77,11 +80,41 @@ const { title } = Astro.props;
         color: #900;
         font-size: 0.85em;
       }
+      nav {
+        justify-content: space-between;
+        align-items: center;
+      }
+      nav .enlaces {
+        display: flex;
+        gap: 1rem;
+      }
+      nav .sesion {
+        font-weight: normal;
+        font-size: 0.9em;
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+      }
     </style>
   </head>
   <body>
     <nav>
-      <a href="/negocios">Negocios</a>
+      <span class="enlaces">
+        {usuario?.rol === "admin" && <a href="/admin/negocios">Negocios</a>}
+        {usuario?.rol === "dueno" && usuario.negocio_id && (
+          <>
+            <a href={`/negocios/${usuario.negocio_id}/editar`}>Mi negocio</a>
+            <a href={`/negocios/${usuario.negocio_id}/horarios`}>Horarios</a>
+            <a href={`/negocios/${usuario.negocio_id}/citas`}>Citas</a>
+          </>
+        )}
+      </span>
+      {usuario && (
+        <span class="sesion">
+          {usuario.email}
+          <a href="/auth/logout">Salir</a>
+        </span>
+      )}
     </nav>
     <h1>{title}</h1>
     <slot />

@@ -1,7 +1,12 @@
 ---
 import { env } from "cloudflare:workers";
-import Layout from "../../layouts/Layout.astro";
-import { listarNegocios, cambiarActivo } from "../../lib/db.ts";
+import Layout from "../../../layouts/Layout.astro";
+import { listarNegociosConSuscripcion, cambiarActivo } from "../../../lib/db.ts";
+
+// Doble chequeo además del link oculto en la nav: la URL es adivinable.
+if (Astro.locals.usuario.rol !== "admin") {
+  return new Response("No autorizado", { status: 403 });
+}
 
 if (Astro.request.method === "POST") {
   const form = await Astro.request.formData();
@@ -10,13 +15,13 @@ if (Astro.request.method === "POST") {
   if (negocioId) {
     await cambiarActivo(env.DB, negocioId, activo);
   }
-  return Astro.redirect("/negocios");
+  return Astro.redirect("/admin/negocios");
 }
 
-const negocios = await listarNegocios(env.DB);
+const negocios = await listarNegociosConSuscripcion(env.DB);
 ---
 
-<Layout title="Negocios">
+<Layout title="Negocios (todos)">
   <p><a href="/negocios/nuevo">+ Nuevo negocio</a></p>
 
   {negocios.length === 0 && <p>Todavía no hay negocios cargados.</p>}
@@ -28,6 +33,7 @@ const negocios = await listarNegocios(env.DB);
           <th>Nombre</th>
           <th>Servicio</th>
           <th>Teléfono</th>
+          <th>Plan</th>
           <th>Estado</th>
           <th></th>
         </tr>
@@ -38,6 +44,7 @@ const negocios = await listarNegocios(env.DB);
             <td><a href={`/negocios/${n.id}/editar`}>{n.nombre}</a></td>
             <td>{n.servicio_nombre} ({n.duracion_minutos} min)</td>
             <td>{n.telefono_whatsapp}</td>
+            <td>{n.plan_codigo ?? "—"} {n.suscripcion_estado && `(${n.suscripcion_estado})`}</td>
             <td>{n.activo ? "Activo" : <span class="badge-inactivo">Inactivo</span>}</td>
             <td>
               <a href={`/negocios/${n.id}/horarios`}>Horarios</a>

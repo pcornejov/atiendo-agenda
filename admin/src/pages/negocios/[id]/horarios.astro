@@ -4,12 +4,19 @@ import Layout from "../../../layouts/Layout.astro";
 import { obtenerNegocio, listarHorarios, crearHorario, eliminarHorario } from "../../../lib/db.ts";
 import { esRangoHorarioValido } from "../../../lib/validacion.ts";
 import { nombreDiaSemana } from "../../../lib/tz.ts";
+import { puedeAdministrarNegocio } from "../../../lib/autorizacion.ts";
 
+const usuario = Astro.locals.usuario;
 const negocioId = Number(Astro.params.id);
+if (!puedeAdministrarNegocio(usuario, negocioId)) {
+  return new Response("No autorizado", { status: 403 });
+}
+
 const negocio = await obtenerNegocio(env.DB, negocioId);
 if (!negocio) {
   return new Response("Negocio no encontrado", { status: 404 });
 }
+const volverUrl = usuario.rol === "admin" ? "/admin/negocios" : `/negocios/${negocioId}/editar`;
 
 let error: string | null = null;
 
@@ -39,7 +46,7 @@ const horarios = await listarHorarios(env.DB, negocioId);
 ---
 
 <Layout title={`Horarios — ${negocio.nombre}`}>
-  <p><a href="/negocios">&larr; Volver a negocios</a></p>
+  <p><a href={volverUrl}>&larr; Volver</a></p>
 
   {error && <div class="error">{error}</div>}
 

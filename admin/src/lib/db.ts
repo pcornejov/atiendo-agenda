@@ -24,6 +24,25 @@ export async function listarNegocios(db: D1Database): Promise<Negocio[]> {
   return resultado.results;
 }
 
+export interface NegocioConSuscripcion extends Negocio {
+  plan_codigo: string | null;
+  suscripcion_estado: string | null;
+}
+
+/** Igual que listarNegocios, pero con el plan/estado de suscripción para la vista de administrador. */
+export async function listarNegociosConSuscripcion(db: D1Database): Promise<NegocioConSuscripcion[]> {
+  const resultado = await db
+    .prepare(
+      `SELECT n.*, p.codigo AS plan_codigo, s.estado AS suscripcion_estado
+       FROM negocios n
+       LEFT JOIN negocio_suscripciones s ON s.negocio_id = n.id
+       LEFT JOIN planes p ON p.id = s.plan_id
+       ORDER BY n.created_at DESC`
+    )
+    .all<NegocioConSuscripcion>();
+  return resultado.results;
+}
+
 export async function obtenerNegocio(db: D1Database, negocioId: number): Promise<Negocio | null> {
   const negocio = await db.prepare("SELECT * FROM negocios WHERE id = ?").bind(negocioId).first<Negocio>();
   return negocio ?? null;
@@ -159,4 +178,49 @@ export async function cancelarCitaPorId(db: D1Database, negocioId: number, citaI
     .prepare("UPDATE citas SET estado = 'cancelada' WHERE id = ? AND negocio_id = ?")
     .bind(citaId, negocioId)
     .run();
+}
+
+export type Rol = "admin" | "dueno";
+
+export interface Usuario {
+  id: number;
+  google_sub: string;
+  email: string;
+  rol: Rol;
+  negocio_id: number | null;
+}
+
+const COLUMNAS_USUARIO = "id, google_sub, email, rol, negocio_id";
+
+export async function obtenerUsuarioPorGoogleSub(db: D1Database, googleSub: string): Promise<Usuario | null> {
+  const usuario = await db
+    .prepare(`SELECT ${COLUMNAS_USUARIO} FROM usuarios WHERE google_sub = ?`)
+    .bind(googleSub)
+    .first<Usuario>();
+  return usuario ?? null;
+}
+
+export async function obtenerUsuarioPorId(db: D1Database, id: number): Promise<Usuario | null> {
+  const usuario = await db
+    .prepare(`SELECT ${COLUMNAS_USUARIO} FROM usuarios WHERE id = ?`)
+    .bind(id)
+    .first<Usuario>();
+  return usuario ?? null;
+}
+
+export async function crearUsuario(
+  db: D1Database,
+  params: { googleSub: string; email: string; rol: Rol }
+): Promise<Usuario> {
+  const usuario = await db
+    .prepare(`INSERT INTO usuarios (google_sub, email, rol) VALUES (?, ?, ?) RETURNING ${COLUMNAS_USUARIO}`)
+    .bind(params.googleSub, params.email, params.rol)
+    .first<Usuario>();
+  if (!usuario) throw new Error("No se pudo crear el usuario");
+  return usuario;
+}
+
+/** Vincula un usuario 'dueno' recién registrado a un negocio nuevo, completando su onboarding. */
+export async function vincularUsuarioANegocio(db: D1Database, usuarioId: number, negocioId: number): Promise<void> {
+  await db.prepare("UPDATE usuarios SET negocio_id = ? WHERE id = ?").bind(negocioId, usuarioId).run();
 }

@@ -5,8 +5,12 @@ interface Props {
   valores: NegocioFormValores;
   errores: string[];
   textoBoton: string;
+  // El alta del Phone Number ID de WhatsApp sigue siendo un paso manual del
+  // administrador en Meta Business Manager (ver admin/README.md) — un dueño
+  // de negocio no puede editarlo desde acá.
+  bloquearWhatsapp?: boolean;
 }
-const { valores, errores, textoBoton } = Astro.props;
+const { valores, errores, textoBoton, bloquearWhatsapp = false } = Astro.props;
 ---
 
 {errores.length > 0 && (
@@ -38,7 +42,14 @@ const { valores, errores, textoBoton } = Astro.props;
   </label>
   <label>
     Phone Number ID de WhatsApp (Meta App &gt; WhatsApp &gt; API Setup)
-    <input type="text" name="whatsapp_phone_number_id" value={valores.whatsapp_phone_number_id} required />
+    <input
+      type="text"
+      name="whatsapp_phone_number_id"
+      value={valores.whatsapp_phone_number_id}
+      readonly={bloquearWhatsapp}
+      required
+    />
+    {bloquearWhatsapp && <small>Este dato lo conecta el equipo de Atiendo Agenda — escríbenos para activarlo.</small>}
   </label>
   <label>
     Zona horaria (IANA, ej. America/Santiago)

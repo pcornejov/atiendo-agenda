@@ -1,0 +1,91 @@
+---
+// Alta self-service del negocio de un dueño nuevo. A diferencia de
+// /negocios/nuevo (uso del administrador, con teléfono/Phone Number ID de
+// WhatsApp reales), acá el dueño solo carga los datos de su negocio — la
+// conexión del número de WhatsApp sigue siendo un paso manual del equipo de
+// Atiendo Agenda (ver limitación documentada en admin/README.md), así que
+// esos dos campos se completan con un valor "pendiente" único y se editan
+// después desde el lado del administrador.
+import { env } from "cloudflare:workers";
+import Layout from "../layouts/Layout.astro";
+import { crearNegocio, vincularUsuarioANegocio } from "../lib/db.ts";
+import { validarNegocioForm, type NegocioFormValores } from "../lib/validacion.ts";
+
+const usuario = Astro.locals.usuario;
+if (usuario.negocio_id) {
+  return Astro.redirect(`/negocios/${usuario.negocio_id}/editar`);
+}
+
+let errores: string[] = [];
+let valores = {
+  nombre: "",
+  servicio_nombre: "",
+  duracion_minutos: "45",
+  timezone: "America/Santiago",
+};
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  valores = {
+    nombre: String(form.get("nombre") ?? ""),
+    servicio_nombre: String(form.get("servicio_nombre") ?? ""),
+    duracion_minutos: String(form.get("duracion_minutos") ?? ""),
+    timezone: String(form.get("timezone") ?? ""),
+  };
+
+  const valoresCompletos: NegocioFormValores = {
+    ...valores,
+    telefono_whatsapp: `pendiente-${crypto.randomUUID()}`,
+    whatsapp_phone_number_id: `pendiente-${crypto.randomUUID()}`,
+  };
+
+  const validacion = validarNegocioForm(valoresCompletos);
+  if (validacion.ok) {
+    const resultado = await crearNegocio(env.DB, validacion.datos);
+    if (resultado.ok) {
+      await vincularUsuarioANegocio(env.DB, usuario.id, resultado.id);
+      return Astro.redirect(`/negocios/${resultado.id}/horarios`);
+    }
+    errores = [resultado.error];
+  } else {
+    errores = validacion.errores;
+  }
+}
+---
+
+<Layout title="Crea tu negocio">
+  <p>Cuéntanos sobre tu negocio para configurar tu chatbot de WhatsApp.</p>
+
+  {errores.length > 0 && (
+    <div class="error">
+      <ul>
+        {errores.map((e) => <li>{e}</li>)}
+      </ul>
+    </div>
+  )}
+
+  <form method="POST" class="form-grid">
+    <label>
+      Nombre del negocio
+      <input type="text" name="nombre" value={valores.nombre} required />
+    </label>
+    <label>
+      Servicio
+      <input type="text" name="servicio_nombre" value={valores.servicio_nombre} required />
+    </label>
+    <label>
+      Duración del servicio (minutos)
+      <input type="number" name="duracion_minutos" value={valores.duracion_minutos} min="1" required />
+    </label>
+    <label>
+      Zona horaria (IANA, ej. America/Santiago)
+      <input type="text" name="timezone" value={valores.timezone} required />
+    </label>
+    <button type="submit">Crear mi negocio</button>
+  </form>
+
+  <p><small>
+    Después de crear tu negocio, nuestro equipo te va a contactar para conectar tu número de
+    WhatsApp — es el único paso que todavía no es automático.
+  </small></p>
+</Layout>
