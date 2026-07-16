@@ -1,4 +1,402 @@
 ---
-const usuario = Astro.locals.usuario;
-return Astro.redirect(usuario.rol === "admin" ? "/admin/negocios" : `/negocios/${usuario.negocio_id}/editar`);
+import { env } from "cloudflare:workers";
+import DesignTokens from "../layouts/DesignTokens.astro";
+import ChatDemo from "../components/ChatDemo.astro";
+import { listarPlanesActivos } from "../lib/db.ts";
+import { DEMO_AGENDA, DEMO_COMIDA, DEMO_DENTAL, DEMO_CAFETERIA } from "../lib/demoMensajes.ts";
+import { redirigirSegunUsuario } from "../lib/auth.ts";
+
+// Landing pública — quien ya tiene sesión no necesita verla, va directo a su panel.
+if (Astro.locals.usuario) {
+  return Astro.redirect(redirigirSegunUsuario(Astro.locals.usuario));
+}
+
+const planes = await listarPlanesActivos(env.DB);
+const NOMBRES_PLAN: Record<string, { nombre: string; descripcion: string }> = {
+  basico: { nombre: "Agenda de horas", descripcion: "Tus clientes reservan y consultan horas por WhatsApp." },
+  nivel2: { nombre: "Venta de comida", descripcion: "Tus clientes ven la carta y hacen pedidos por WhatsApp." },
+};
 ---
+
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Atiendo Agenda — Tu WhatsApp, atendido solo</title>
+    <meta
+      name="description"
+      content="Atiendo Agenda conecta un chatbot a tu WhatsApp para agendar horas o tomar pedidos, sin que tengas que estar pendiente del teléfono."
+    />
+    <DesignTokens />
+    <style>
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: var(--font-body);
+        line-height: 1.55;
+      }
+      h1,
+      h2,
+      h3 {
+        font-family: var(--font-display);
+        text-wrap: balance;
+        line-height: 1.2;
+        color: var(--ink);
+      }
+      a {
+        color: var(--accent);
+      }
+      .contenedor {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 0 1.5rem;
+      }
+
+      header {
+        border-bottom: 1px solid var(--line);
+      }
+      header .contenedor {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding-top: 1.25rem;
+        padding-bottom: 1.25rem;
+      }
+      .marca {
+        font-family: var(--font-display);
+        font-weight: 600;
+        font-size: 1.2rem;
+      }
+      header nav {
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+      }
+
+      .boton {
+        display: inline-block;
+        padding: 0.65rem 1.25rem;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 0.95rem;
+        text-decoration: none;
+        border: 1px solid var(--accent);
+        transition: opacity 0.15s ease;
+      }
+      .boton:hover {
+        opacity: 0.88;
+      }
+      .boton-primario {
+        background: var(--accent);
+        color: var(--accent-ink);
+      }
+      .boton-secundario {
+        background: transparent;
+        color: var(--ink);
+        border-color: var(--line);
+      }
+
+      .hero {
+        padding: 4rem 0 3rem;
+        text-align: center;
+      }
+      .hero h1 {
+        font-size: clamp(2rem, 5vw, 3rem);
+        margin: 0 0 1rem;
+      }
+      .hero p {
+        max-width: 55ch;
+        margin: 0 auto 2rem;
+        font-size: 1.1rem;
+        color: var(--ink-muted);
+      }
+      .hero .cta {
+        display: flex;
+        gap: 0.75rem;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+
+      section {
+        padding: 3rem 0;
+      }
+      section h2 {
+        font-size: 1.6rem;
+        text-align: center;
+        margin: 0 0 0.5rem;
+      }
+      section > .contenedor > p.subtitulo {
+        text-align: center;
+        color: var(--ink-muted);
+        max-width: 55ch;
+        margin: 0 auto 2rem;
+      }
+
+      /* Demo de conversaciones */
+      .demo-tabs input[type="radio"] {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+      }
+      .tabs-botones {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        justify-content: center;
+        margin-bottom: 1.5rem;
+      }
+      .tabs-botones label {
+        padding: 0.5rem 1rem;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        color: var(--ink-muted);
+        background: var(--surface);
+      }
+      .demo-panel-tab {
+        display: none;
+        max-width: 480px;
+        margin: 0 auto;
+        padding: 1.25rem;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--surface);
+      }
+      #tab-agenda:checked ~ .tabs-botones label[for="tab-agenda"],
+      #tab-comida:checked ~ .tabs-botones label[for="tab-comida"],
+      #tab-dental:checked ~ .tabs-botones label[for="tab-dental"],
+      #tab-cafeteria:checked ~ .tabs-botones label[for="tab-cafeteria"] {
+        background: var(--accent);
+        color: var(--accent-ink);
+        border-color: var(--accent);
+      }
+      #tab-agenda:checked ~ .panel-agenda,
+      #tab-comida:checked ~ .panel-comida,
+      #tab-dental:checked ~ .panel-dental,
+      #tab-cafeteria:checked ~ .panel-cafeteria {
+        display: block;
+      }
+
+      /* Cómo funciona */
+      .pasos {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: 1fr;
+      }
+      .paso {
+        padding: 1.25rem;
+        border: 1.5px solid var(--line);
+        border-radius: 10px;
+        background: var(--surface);
+      }
+      .paso .numero {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        border-radius: 50%;
+        background: var(--accent);
+        color: var(--accent-ink);
+        font-family: var(--font-display);
+        font-weight: 600;
+        margin-bottom: 0.75rem;
+      }
+      .paso h3 {
+        font-size: 1.05rem;
+        margin: 0 0 0.4rem;
+      }
+      .paso p {
+        margin: 0;
+        color: var(--ink-muted);
+        font-size: 0.9rem;
+      }
+
+      /* Precios */
+      .precios {
+        display: grid;
+        gap: 1.25rem;
+        grid-template-columns: 1fr;
+        max-width: 700px;
+        margin: 0 auto;
+      }
+      .tarjeta-precio {
+        padding: 1.5rem;
+        border: 1.5px solid var(--line);
+        border-radius: 12px;
+        background: var(--surface);
+        text-align: center;
+      }
+      .tarjeta-precio h3 {
+        font-size: 1.15rem;
+        margin: 0 0 0.5rem;
+      }
+      .tarjeta-precio .precio {
+        font-family: var(--font-display);
+        font-size: 2rem;
+        font-variant-numeric: tabular-nums;
+        display: block;
+        margin: 0.5rem 0;
+      }
+      .tarjeta-precio .precio small {
+        font-family: var(--font-body);
+        font-size: 0.95rem;
+        font-weight: normal;
+        color: var(--ink-muted);
+      }
+      .tarjeta-precio p.descripcion {
+        color: var(--ink-muted);
+        font-size: 0.9rem;
+        margin: 0 0 1.25rem;
+      }
+
+      .cta-final {
+        text-align: center;
+        background: var(--surface);
+        border-top: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+      }
+      .cta-final h2 {
+        margin-bottom: 1.5rem;
+      }
+
+      footer {
+        padding: 2rem 0;
+        text-align: center;
+        color: var(--ink-muted);
+        font-size: 0.85rem;
+      }
+
+      @media (min-width: 640px) {
+        .pasos {
+          grid-template-columns: repeat(3, 1fr);
+        }
+        .precios {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="contenedor">
+        <span class="marca">Atiendo Agenda</span>
+        <nav>
+          <a href="/auth/login" class="boton boton-secundario">Iniciar sesión</a>
+          <a href="/auth/registro" class="boton boton-primario">Crear cuenta</a>
+        </nav>
+      </div>
+    </header>
+
+    <section class="hero">
+      <div class="contenedor">
+        <h1>Tu WhatsApp, atendido solo</h1>
+        <p>
+          Conecta un chatbot a tu WhatsApp para que tus clientes agenden horas o hagan pedidos
+          las 24 horas, sin que tengas que estar pendiente del teléfono.
+        </p>
+        <div class="cta">
+          <a href="/auth/registro" class="boton boton-primario">Crear cuenta gratis</a>
+          <a href="/auth/login" class="boton boton-secundario">Iniciar sesión</a>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="contenedor">
+        <h2>Así conversa tu bot</h2>
+        <p class="subtitulo">
+          Ejemplos reales de cómo responde — elige un rubro para ver la conversación completa.
+        </p>
+
+        <div class="demo-tabs">
+          <input type="radio" name="demo-tab" id="tab-agenda" checked />
+          <input type="radio" name="demo-tab" id="tab-comida" />
+          <input type="radio" name="demo-tab" id="tab-dental" />
+          <input type="radio" name="demo-tab" id="tab-cafeteria" />
+
+          <div class="tabs-botones">
+            <label for="tab-agenda">Peluquería</label>
+            <label for="tab-comida">Comida rápida</label>
+            <label for="tab-dental">Clínica dental</label>
+            <label for="tab-cafeteria">Cafetería</label>
+          </div>
+
+          <div class="demo-panel-tab panel-agenda">
+            <ChatDemo mensajes={DEMO_AGENDA} />
+          </div>
+          <div class="demo-panel-tab panel-comida">
+            <ChatDemo mensajes={DEMO_COMIDA} />
+          </div>
+          <div class="demo-panel-tab panel-dental">
+            <ChatDemo mensajes={DEMO_DENTAL} />
+          </div>
+          <div class="demo-panel-tab panel-cafeteria">
+            <ChatDemo mensajes={DEMO_CAFETERIA} />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="contenedor">
+        <h2>Cómo funciona</h2>
+        <p class="subtitulo">Sin instalar nada — todo pasa por el WhatsApp que ya tienes.</p>
+        <div class="pasos">
+          <div class="paso">
+            <span class="numero">1</span>
+            <h3>Creas tu cuenta</h3>
+            <p>Te registras, eliges si necesitas agenda de horas o venta de comida, y contratas el plan.</p>
+          </div>
+          <div class="paso">
+            <span class="numero">2</span>
+            <h3>Conectamos tu WhatsApp</h3>
+            <p>Coordinamos contigo la conexión de tu número — es el único paso manual, por ahora.</p>
+          </div>
+          <div class="paso">
+            <span class="numero">3</span>
+            <h3>Tu bot responde solo</h3>
+            <p>Cargas tus horarios o tu carta, y tus clientes ya pueden escribirte cuando quieran.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="contenedor">
+        <h2>Precios</h2>
+        <p class="subtitulo">Un plan por tipo de negocio, vigente por 30 días.</p>
+        <div class="precios">
+          {planes.map((plan) => {
+            const info = NOMBRES_PLAN[plan.codigo] ?? { nombre: plan.nombre, descripcion: "" };
+            return (
+              <div class="tarjeta-precio">
+                <h3>{info.nombre}</h3>
+                <p class="descripcion">{info.descripcion}</p>
+                <span class="precio">
+                  ${plan.precio_mensual_clp.toLocaleString("es-CL")}<small> / mes</small>
+                </span>
+                <a href="/auth/registro" class="boton boton-primario">Crear cuenta gratis</a>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+
+    <section class="cta-final">
+      <div class="contenedor">
+        <h2>Deja que tu WhatsApp trabaje solo</h2>
+        <a href="/auth/registro" class="boton boton-primario">Crear cuenta gratis</a>
+      </div>
+    </section>
+
+    <footer>
+      <div class="contenedor">© {new Date().getFullYear()} Atiendo Agenda</div>
+    </footer>
+  </body>
+</html>

@@ -4,8 +4,8 @@ import WizardLayout from "../../layouts/WizardLayout.astro";
 import { obtenerNegocio } from "../../lib/db.ts";
 
 const usuario = Astro.locals.usuario;
-if (usuario.rol !== "dueno" || !usuario.negocio_id) {
-  return Astro.redirect(usuario.rol === "admin" ? "/admin/negocios" : "/onboarding");
+if (!usuario || usuario.rol !== "dueno" || !usuario.negocio_id) {
+  return Astro.redirect(usuario?.rol === "admin" ? "/admin/negocios" : "/onboarding");
 }
 const negocio = await obtenerNegocio(env.DB, usuario.negocio_id);
 if (!negocio) return Astro.redirect("/onboarding");

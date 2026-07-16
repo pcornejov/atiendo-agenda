@@ -4,7 +4,7 @@ import Layout from "../../../layouts/Layout.astro";
 import { listarNegociosConSuscripcion, cambiarActivo } from "../../../lib/db.ts";
 
 // Doble chequeo además del link oculto en la nav: la URL es adivinable.
-if (Astro.locals.usuario.rol !== "admin") {
+if (Astro.locals.usuario?.rol !== "admin") {
   return new Response("No autorizado", { status: 403 });
 }
 

@@ -7,7 +7,7 @@ import { validarNegocioForm, type NegocioFormValores } from "../../lib/validacio
 
 // Alta manual de un piloto por el administrador. El alta self-service de un
 // dueño de negocio pasa por /onboarding, no por acá.
-if (Astro.locals.usuario.rol !== "admin") {
+if (Astro.locals.usuario?.rol !== "admin") {
   return new Response("No autorizado", { status: 403 });
 }
 

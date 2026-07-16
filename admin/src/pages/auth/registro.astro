@@ -1,0 +1,97 @@
+---
+import { env } from "cloudflare:workers";
+import Layout from "../../layouts/Layout.astro";
+import { obtenerUsuarioPorEmail, crearUsuario } from "../../lib/db.ts";
+import { hashPassword } from "../../lib/password.ts";
+import { validarRegistroForm } from "../../lib/validacion.ts";
+import { redirigirSegunUsuario } from "../../lib/auth.ts";
+
+// Si ya hay sesión activa, no tiene sentido mostrar el formulario de registro.
+if (Astro.locals.usuario) {
+  return Astro.redirect(redirigirSegunUsuario(Astro.locals.usuario));
+}
+
+let error: string | null = null;
+let email = "";
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  email = String(form.get("email") ?? "");
+  const password = String(form.get("password") ?? "");
+  const password_confirmacion = String(form.get("password_confirmacion") ?? "");
+
+  const validacion = validarRegistroForm({ email, password, password_confirmacion });
+  if (!validacion.ok) {
+    error = validacion.errores.join(" ");
+  } else {
+    const existente = await obtenerUsuarioPorEmail(env.DB, validacion.datos.email);
+
+    if (existente && existente.google_sub !== null) {
+      error = "Ya existe una cuenta con este email usando Google — usa el botón \"Entrar con Google\" en /auth/login.";
+    } else if (existente) {
+      error = "Ya existe una cuenta con este email. Inicia sesión en su lugar.";
+    } else {
+      // rol siempre 'dueno' acá — el registro por contraseña no tiene forma
+      // de verificar que quien completa el formulario controla ese email
+      // (no hay envío de correos en el proyecto todavía), así que nunca
+      // puede otorgar rol de administrador. Ese acceso queda exclusivo del
+      // login con Google, que sí prueba la identidad. No agregar env.ADMIN_EMAIL acá.
+      const passwordHash = await hashPassword(validacion.datos.password);
+      const usuario = await crearUsuario(env.DB, {
+        googleSub: null,
+        email: validacion.datos.email,
+        rol: "dueno",
+        passwordHash,
+      });
+      Astro.session?.set("usuarioId", usuario.id);
+      return Astro.redirect(redirigirSegunUsuario(usuario));
+    }
+  }
+}
+---
+
+<Layout title="Crear cuenta">
+  <p>Crea tu cuenta para empezar a configurar tu chatbot de WhatsApp.</p>
+
+  {error && <div class="error">{error}</div>}
+
+  <form method="POST" class="form-grid">
+    <label>
+      Email
+      <input type="email" name="email" value={email} required autocomplete="email" />
+    </label>
+    <label>
+      Contraseña
+      <input type="password" name="password" required autocomplete="new-password" minlength="8" />
+    </label>
+    <label>
+      Confirmar contraseña
+      <input type="password" name="password_confirmacion" required autocomplete="new-password" minlength="8" />
+    </label>
+    <button type="submit">Crear cuenta</button>
+  </form>
+
+  <p>
+    <a href="/auth/google" class="boton-secundario-link">Registrarme con Google</a>
+  </p>
+
+  <p><small>
+    ¿Ya tienes cuenta? <a href="/auth/login">Inicia sesión</a>.
+  </small></p>
+</Layout>
+
+<style>
+  .boton-secundario-link {
+    display: inline-block;
+    padding: 0.6rem 1.1rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    color: var(--ink);
+    text-decoration: none;
+  }
+  .boton-secundario-link:hover {
+    background: var(--surface);
+  }
+</style>

@@ -7,6 +7,8 @@ import {
   esRangoHorarioValido,
   esTimezoneValida,
   validarNegocioForm,
+  validarRegistroForm,
+  validarLoginForm,
 } from "./validacion.ts";
 
 test("esEnteroPositivo", () => {
@@ -75,4 +77,56 @@ test("validarNegocioForm recorta espacios en los campos de texto", () => {
   if (resultado.ok) {
     assert.equal(resultado.datos.nombre, "Peluquería Demo");
   }
+});
+
+const REGISTRO_VALIDO = {
+  email: "Dueno@Ejemplo.cl",
+  password: "contraseña-segura",
+  password_confirmacion: "contraseña-segura",
+};
+
+test("validarRegistroForm acepta valores correctos y normaliza el email (trim + minúsculas)", () => {
+  const resultado = validarRegistroForm(REGISTRO_VALIDO);
+  assert.equal(resultado.ok, true);
+  if (resultado.ok) {
+    assert.equal(resultado.datos.email, "dueno@ejemplo.cl");
+  }
+});
+
+test("validarRegistroForm rechaza email vacío o mal formado", () => {
+  assert.equal(validarRegistroForm({ ...REGISTRO_VALIDO, email: "" }).ok, false);
+  assert.equal(validarRegistroForm({ ...REGISTRO_VALIDO, email: "no-es-un-email" }).ok, false);
+});
+
+test("validarRegistroForm exige contraseña de al menos 8 caracteres", () => {
+  const resultado = validarRegistroForm({ ...REGISTRO_VALIDO, password: "1234567", password_confirmacion: "1234567" });
+  assert.equal(resultado.ok, false);
+});
+
+test("validarRegistroForm exige que la confirmación coincida", () => {
+  const resultado = validarRegistroForm({ ...REGISTRO_VALIDO, password_confirmacion: "otra-cosa" });
+  assert.equal(resultado.ok, false);
+});
+
+test("validarRegistroForm junta todos los errores en vez de cortar en el primero", () => {
+  const resultado = validarRegistroForm({ email: "", password: "123", password_confirmacion: "456" });
+  assert.equal(resultado.ok, false);
+  if (!resultado.ok) {
+    assert.equal(resultado.errores.length, 3);
+  }
+});
+
+test("validarLoginForm acepta valores correctos y normaliza el email", () => {
+  const resultado = validarLoginForm({ email: "Dueno@Ejemplo.cl", password: "cualquiera" });
+  assert.equal(resultado.ok, true);
+  if (resultado.ok) {
+    assert.equal(resultado.datos.email, "dueno@ejemplo.cl");
+  }
+});
+
+test("validarLoginForm rechaza email o password vacíos, sin exigir largo mínimo de password", () => {
+  assert.equal(validarLoginForm({ email: "", password: "1234567" }).ok, false);
+  assert.equal(validarLoginForm({ email: "a@b.cl", password: "" }).ok, false);
+  // password corta (menor al mínimo de registro) igual pasa en login — no es una regla de login
+  assert.equal(validarLoginForm({ email: "a@b.cl", password: "1234" }).ok, true);
 });

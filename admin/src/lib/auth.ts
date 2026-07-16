@@ -3,6 +3,8 @@
 // vez de validar la firma JWT nosotros mismos — evita depender de una
 // librería de JWT/JWKS solo para este único uso.
 
+import type { Rol } from "./db.ts";
+
 const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_TOKENINFO_URL = "https://oauth2.googleapis.com/tokeninfo";
@@ -83,4 +85,15 @@ export async function intercambiarCodigoPorIdentidad(params: {
   }
 
   return { sub: info.sub, email: info.email };
+}
+
+/**
+ * A dónde mandar a alguien recién autenticado (por Google o por contraseña,
+ * no importa el método) — usado por auth/callback.ts, auth/login.astro y
+ * auth/registro.astro para no repetir esta cadena de ifs en cada uno.
+ */
+export function redirigirSegunUsuario(usuario: { rol: Rol; negocio_id: number | null }): string {
+  if (usuario.rol === "admin") return "/admin/negocios";
+  if (usuario.negocio_id) return `/negocios/${usuario.negocio_id}/editar`;
+  return "/onboarding";
 }

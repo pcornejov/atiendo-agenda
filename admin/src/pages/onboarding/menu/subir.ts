@@ -15,8 +15,8 @@ const TAMANO_MAXIMO_TOTAL_BYTES = 15 * 1024 * 1024;
 
 export const POST: APIRoute = async ({ request, redirect, session, locals }) => {
   const usuario = locals.usuario;
-  if (usuario.rol !== "dueno" || !usuario.negocio_id) {
-    return redirect(usuario.rol === "admin" ? "/admin/negocios" : "/onboarding");
+  if (!usuario || usuario.rol !== "dueno" || !usuario.negocio_id) {
+    return redirect(usuario?.rol === "admin" ? "/admin/negocios" : "/onboarding");
   }
 
   const form = await request.formData();

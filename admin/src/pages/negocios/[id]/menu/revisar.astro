@@ -7,7 +7,7 @@ import type { ItemMenuExtraido } from "../../../../lib/menu-parser.ts";
 
 const usuario = Astro.locals.usuario;
 const negocioId = Number(Astro.params.id);
-if (!puedeAdministrarNegocio(usuario, negocioId)) {
+if (!usuario || !puedeAdministrarNegocio(usuario, negocioId)) {
   return new Response("No autorizado", { status: 403 });
 }
 

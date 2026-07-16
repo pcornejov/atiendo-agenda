@@ -43,14 +43,37 @@ npx wrangler d1 execute atiendo-agenda-db --local --file=../seed.sql
 npm run dev
 ```
 
-Abre `http://localhost:4321/` — redirige a `/auth/login`.
+Abre `http://localhost:4321/` — muestra la landing pública (`/`, fuera del
+login). Desde ahí, "Iniciar sesión" y "Crear cuenta" llevan a `/auth/login` y
+`/auth/registro`.
 
-## Login con Google
+## Login: Google o email/contraseña
 
-El panel ya no usa Cloudflare Access — el login es una cuenta de Google real,
-para que cualquier dueño de negocio se pueda registrar sin que el
-administrador tenga que darlo de alta a mano en un dashboard. Para que
-funcione hace falta un OAuth Client de Google:
+El panel no usa Cloudflare Access — hay dos formas de entrar, para que
+cualquier dueño de negocio se pueda registrar sin que el administrador tenga
+que darlo de alta a mano en un dashboard:
+
+- **Google** (`/auth/google` inicia el flujo, `/auth/callback` lo recibe) —
+  crea la cuenta sola en el primer login.
+- **Email + contraseña** (`/auth/registro` para crear cuenta, `/auth/login`
+  para entrar) — hashing con PBKDF2 vía Web Crypto (`src/lib/password.ts`),
+  sin dependencias nuevas.
+
+**El rol `admin` es exclusivo del login con Google** — el registro por
+contraseña siempre crea `rol = 'dueno'`, nunca lee `ADMIN_EMAIL`, porque no
+hay forma de verificar que quien completa ese formulario controla el correo
+que escribió (no hay envío de emails en el proyecto todavía). Confiar en la
+coincidencia de email ahí sería dejar que cualquiera se autoasigne admin
+escribiendo el correo del administrador — ver el comentario en
+`src/pages/auth/registro.astro`.
+
+Si un email ya tiene cuenta por el otro método (Google vs. contraseña), el
+sistema bloquea con un mensaje indicando cuál usar — no fusiona cuentas
+automáticamente.
+
+### Configurar el OAuth Client de Google
+
+Para que el login con Google funcione hace falta un OAuth Client:
 
 1. Entra a [Google Cloud Console](https://console.cloud.google.com/) → crea
    un proyecto (o usa uno existente) → **APIs & Services** → **Credentials**

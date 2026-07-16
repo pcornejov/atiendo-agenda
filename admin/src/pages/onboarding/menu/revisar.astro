@@ -5,8 +5,8 @@ import { crearMenuItemsEnLote } from "../../../lib/db.ts";
 import type { ItemMenuExtraido } from "../../../lib/menu-parser.ts";
 
 const usuario = Astro.locals.usuario;
-if (usuario.rol !== "dueno" || !usuario.negocio_id) {
-  return Astro.redirect(usuario.rol === "admin" ? "/admin/negocios" : "/onboarding");
+if (!usuario || usuario.rol !== "dueno" || !usuario.negocio_id) {
+  return Astro.redirect(usuario?.rol === "admin" ? "/admin/negocios" : "/onboarding");
 }
 const negocioId = usuario.negocio_id;
 

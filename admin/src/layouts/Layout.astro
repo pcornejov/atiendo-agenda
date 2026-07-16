@@ -1,6 +1,7 @@
 ---
 import { env } from "cloudflare:workers";
 import { listarCodigosModulosActivos, type Usuario } from "../lib/db.ts";
+import DesignTokens from "./DesignTokens.astro";
 
 interface Props {
   title: string;
@@ -18,82 +19,8 @@ const modulosActivos =
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title} — Atiendo Agenda</title>
+    <DesignTokens />
     <style>
-      :root {
-        color-scheme: light dark;
-
-        --paper: #eee9e0;
-        --surface: #f7f4ee;
-        --ink: #26221d;
-        --ink-muted: #6b6459;
-        --line: #d9d2c5;
-        --accent: #b8721e;
-        --accent-ink: #ffffff;
-        --success: #3d7a4f;
-        --success-bg: #e3ede2;
-        --critical: #a8402f;
-        --critical-bg: #f3e1dc;
-        --shadow: 0 1px 2px rgba(38, 34, 29, 0.07), 0 1px 1px rgba(38, 34, 29, 0.04);
-
-        --font-display: ui-serif, Georgia, "Iowan Old Style", "Palatino Linotype", "Noto Serif", serif;
-        --font-body: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      }
-
-      @media (prefers-color-scheme: dark) {
-        :root {
-          --paper: #1b1815;
-          --surface: #242019;
-          --ink: #ede7dc;
-          --ink-muted: #a69d8c;
-          --line: #3a342c;
-          --accent: #e0a64b;
-          --accent-ink: #221a0d;
-          --success: #6fae7c;
-          --success-bg: #26332a;
-          --critical: #e1786a;
-          --critical-bg: #3a2620;
-          --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 1px 1px rgba(0, 0, 0, 0.2);
-        }
-      }
-
-      :root[data-theme="dark"] {
-        --paper: #1b1815;
-        --surface: #242019;
-        --ink: #ede7dc;
-        --ink-muted: #a69d8c;
-        --line: #3a342c;
-        --accent: #e0a64b;
-        --accent-ink: #221a0d;
-        --success: #6fae7c;
-        --success-bg: #26332a;
-        --critical: #e1786a;
-        --critical-bg: #3a2620;
-        --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 1px 1px rgba(0, 0, 0, 0.2);
-      }
-
-      :root[data-theme="light"] {
-        --paper: #eee9e0;
-        --surface: #f7f4ee;
-        --ink: #26221d;
-        --ink-muted: #6b6459;
-        --line: #d9d2c5;
-        --accent: #b8721e;
-        --accent-ink: #ffffff;
-        --success: #3d7a4f;
-        --success-bg: #e3ede2;
-        --critical: #a8402f;
-        --critical-bg: #f3e1dc;
-        --shadow: 0 1px 2px rgba(38, 34, 29, 0.07), 0 1px 1px rgba(38, 34, 29, 0.04);
-      }
-
-      * {
-        box-sizing: border-box;
-      }
-
-      html {
-        overflow-x: hidden;
-      }
-
       body {
         max-width: 840px;
         margin: 0 auto;

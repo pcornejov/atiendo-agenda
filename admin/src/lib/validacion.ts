@@ -20,6 +20,89 @@ export function esTimezoneValida(tz: string): boolean {
   return ZONAS_HORARIAS_VALIDAS.has(tz);
 }
 
+// Regex permisiva ("¿tiene forma de email?"), no validación RFC completa —
+// no hay envío de correos en el proyecto todavía, así que no hace falta más.
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export function pareceEmail(valor: string): boolean {
+  return EMAIL_REGEX.test(valor.trim());
+}
+
+const LARGO_MINIMO_PASSWORD = 8;
+
+export interface RegistroFormValores {
+  email: string;
+  password: string;
+  password_confirmacion: string;
+}
+
+export interface RegistroFormDatos {
+  email: string;
+  password: string;
+}
+
+export type ResultadoValidacionRegistro =
+  | { ok: true; datos: RegistroFormDatos }
+  | { ok: false; errores: string[] };
+
+/** Valida el formulario de registro (email + contraseña). No revisa si el email ya existe — eso lo hace el caller contra la base. */
+export function validarRegistroForm(valores: RegistroFormValores): ResultadoValidacionRegistro {
+  const errores: string[] = [];
+
+  if (valores.email.trim().length === 0) {
+    errores.push("El email no puede estar vacío.");
+  } else if (!pareceEmail(valores.email)) {
+    errores.push("Ese email no parece válido.");
+  }
+
+  if (valores.password.length < LARGO_MINIMO_PASSWORD) {
+    errores.push(`La contraseña debe tener al menos ${LARGO_MINIMO_PASSWORD} caracteres.`);
+  }
+  if (valores.password !== valores.password_confirmacion) {
+    errores.push("Las contraseñas no coinciden.");
+  }
+
+  if (errores.length > 0) return { ok: false, errores };
+
+  return {
+    ok: true,
+    datos: {
+      email: valores.email.trim().toLowerCase(),
+      password: valores.password,
+    },
+  };
+}
+
+export interface LoginFormValores {
+  email: string;
+  password: string;
+}
+
+export type ResultadoValidacionLogin =
+  | { ok: true; datos: { email: string; password: string } }
+  | { ok: false; errores: string[] };
+
+/**
+ * Valida el formulario de login. A propósito no revalida el largo mínimo de
+ * la contraseña acá — una cuenta ya creada podría predatar un mínimo futuro,
+ * y el login no debería rechazar una contraseña correcta por una regla de
+ * política de registro.
+ */
+export function validarLoginForm(valores: LoginFormValores): ResultadoValidacionLogin {
+  const errores: string[] = [];
+
+  if (valores.email.trim().length === 0) {
+    errores.push("El email no puede estar vacío.");
+  } else if (!pareceEmail(valores.email)) {
+    errores.push("Ese email no parece válido.");
+  }
+  if (valores.password.length === 0) errores.push("La contraseña no puede estar vacía.");
+
+  if (errores.length > 0) return { ok: false, errores };
+
+  return { ok: true, datos: { email: valores.email.trim().toLowerCase(), password: valores.password } };
+}
+
 export interface NegocioFormValores {
   nombre: string;
   telefono_whatsapp: string;

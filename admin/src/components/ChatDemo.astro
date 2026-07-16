@@ -1,0 +1,70 @@
+---
+// Renderiza una conversación de ejemplo como burbujas de chat animadas
+// (CSS puro, sin JS de cliente) — usado por /onboarding/servicio y por la
+// landing page. El mecanismo de mostrar/ocultar entre varias conversaciones
+// (radios + :has()) vive en cada página que lo usa, no acá — este componente
+// solo sabe dibujar una conversación.
+import type { Mensaje } from "../lib/demoMensajes.ts";
+
+interface Props {
+  mensajes: Mensaje[];
+}
+const { mensajes } = Astro.props;
+---
+
+<div class="demo-chat">
+  {mensajes.map((m, i) => (
+    <div class={`burbuja burbuja-${m.de}`} style={`animation-delay: ${0.15 + i * 0.55}s`}>
+      {m.texto}
+    </div>
+  ))}
+</div>
+
+<style>
+  .demo-chat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .burbuja {
+    max-width: 82%;
+    padding: 0.5rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    white-space: pre-line;
+    opacity: 0;
+    animation: burbuja-entra 0.4s ease both;
+  }
+  .burbuja-cliente {
+    align-self: flex-end;
+    background: color-mix(in srgb, var(--accent) 20%, var(--surface));
+    color: var(--ink);
+    border-bottom-right-radius: 3px;
+  }
+  .burbuja-bot {
+    align-self: flex-start;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-bottom-left-radius: 3px;
+  }
+
+  @keyframes burbuja-entra {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .burbuja {
+      animation: none;
+      opacity: 1;
+    }
+  }
+</style>

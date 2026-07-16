@@ -1,0 +1,82 @@
+---
+import { env } from "cloudflare:workers";
+import Layout from "../../layouts/Layout.astro";
+import { obtenerCredencialLoginPorEmail } from "../../lib/db.ts";
+import { verificarPassword } from "../../lib/password.ts";
+import { validarLoginForm } from "../../lib/validacion.ts";
+import { redirigirSegunUsuario } from "../../lib/auth.ts";
+
+// Si ya hay sesión activa, no tiene sentido mostrar el formulario de login.
+if (Astro.locals.usuario) {
+  return Astro.redirect(redirigirSegunUsuario(Astro.locals.usuario));
+}
+
+let error: string | null = null;
+let email = "";
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  email = String(form.get("email") ?? "");
+  const password = String(form.get("password") ?? "");
+
+  const validacion = validarLoginForm({ email, password });
+  if (!validacion.ok) {
+    error = validacion.errores.join(" ");
+  } else {
+    const credencial = await obtenerCredencialLoginPorEmail(env.DB, validacion.datos.email);
+
+    if (!credencial) {
+      error = "Email o contraseña incorrectos.";
+    } else if (credencial.password_hash === null) {
+      error = "Esta cuenta usa Google para iniciar sesión — usa el botón \"Entrar con Google\".";
+    } else if (!(await verificarPassword(validacion.datos.password, credencial.password_hash))) {
+      error = "Email o contraseña incorrectos.";
+    } else {
+      Astro.session?.set("usuarioId", credencial.id);
+      return Astro.redirect(redirigirSegunUsuario(credencial));
+    }
+  }
+}
+---
+
+<Layout title="Iniciar sesión">
+  <p>Ingresa con tu correo y contraseña, o con tu cuenta de Google.</p>
+
+  {error && <div class="error">{error}</div>}
+
+  <form method="POST" class="form-grid">
+    <label>
+      Email
+      <input type="email" name="email" value={email} required autocomplete="email" />
+    </label>
+    <label>
+      Contraseña
+      <input type="password" name="password" required autocomplete="current-password" />
+    </label>
+    <button type="submit">Entrar</button>
+  </form>
+
+  <p>
+    <a href="/auth/google" class="boton-secundario-link">Entrar con Google</a>
+  </p>
+
+  <p><small>
+    ¿No tienes cuenta? <a href="/auth/registro">Regístrate</a>.
+  </small></p>
+</Layout>
+
+<style>
+  .boton-secundario-link {
+    display: inline-block;
+    padding: 0.6rem 1.1rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    color: var(--ink);
+    text-decoration: none;
+  }
+  .boton-secundario-link:hover {
+    background: var(--surface);
+  }
+</style>

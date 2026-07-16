@@ -10,8 +10,8 @@ import { env } from "cloudflare:workers";
 import { obtenerCodigoPlanDelNegocio } from "../../lib/db.ts";
 
 const usuario = Astro.locals.usuario;
-if (usuario.rol !== "dueno" || !usuario.negocio_id) {
-  return Astro.redirect(usuario.rol === "admin" ? "/admin/negocios" : "/onboarding");
+if (!usuario || usuario.rol !== "dueno" || !usuario.negocio_id) {
+  return Astro.redirect(usuario?.rol === "admin" ? "/admin/negocios" : "/onboarding");
 }
 
 const codigoPlan = await obtenerCodigoPlanDelNegocio(env.DB, usuario.negocio_id);

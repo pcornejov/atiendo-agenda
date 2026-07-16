@@ -2,7 +2,8 @@
 
 declare namespace App {
   interface Locals {
-    usuario: import("./lib/db.ts").Usuario;
+    // undefined en rutas públicas (landing, login, registro) sin sesión activa.
+    usuario?: import("./lib/db.ts").Usuario;
   }
 }
 

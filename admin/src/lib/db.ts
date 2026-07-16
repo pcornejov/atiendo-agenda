@@ -184,13 +184,20 @@ export type Rol = "admin" | "dueno";
 
 export interface Usuario {
   id: number;
-  google_sub: string;
+  google_sub: string | null;
   email: string;
   rol: Rol;
   negocio_id: number | null;
 }
 
+// password_hash queda deliberadamente fuera de esta lista — ninguna consulta
+// de propósito general lo trae. Solo obtenerCredencialLoginPorEmail, la
+// única función que lo necesita, lo selecciona explícitamente.
 const COLUMNAS_USUARIO = "id, google_sub, email, rol, negocio_id";
+
+function normalizarEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
 
 export async function obtenerUsuarioPorGoogleSub(db: D1Database, googleSub: string): Promise<Usuario | null> {
   const usuario = await db
@@ -208,13 +215,44 @@ export async function obtenerUsuarioPorId(db: D1Database, id: number): Promise<U
   return usuario ?? null;
 }
 
+/** Busca por email (normalizado) sin importar el método de login — para detectar duplicados entre Google y contraseña. */
+export async function obtenerUsuarioPorEmail(db: D1Database, email: string): Promise<Usuario | null> {
+  const usuario = await db
+    .prepare(`SELECT ${COLUMNAS_USUARIO} FROM usuarios WHERE email = ?`)
+    .bind(normalizarEmail(email))
+    .first<Usuario>();
+  return usuario ?? null;
+}
+
+export interface CredencialLogin {
+  id: number;
+  password_hash: string | null;
+  rol: Rol;
+  negocio_id: number | null;
+}
+
+/**
+ * Única función del código que lee password_hash — usada solo por el POST
+ * de /auth/login para verificar la contraseña. password_hash es null si la
+ * cuenta se creó con Google (nunca tuvo contraseña).
+ */
+export async function obtenerCredencialLoginPorEmail(db: D1Database, email: string): Promise<CredencialLogin | null> {
+  const credencial = await db
+    .prepare("SELECT id, password_hash, rol, negocio_id FROM usuarios WHERE email = ?")
+    .bind(normalizarEmail(email))
+    .first<CredencialLogin>();
+  return credencial ?? null;
+}
+
 export async function crearUsuario(
   db: D1Database,
-  params: { googleSub: string; email: string; rol: Rol }
+  params: { googleSub: string | null; email: string; rol: Rol; passwordHash: string | null }
 ): Promise<Usuario> {
   const usuario = await db
-    .prepare(`INSERT INTO usuarios (google_sub, email, rol) VALUES (?, ?, ?) RETURNING ${COLUMNAS_USUARIO}`)
-    .bind(params.googleSub, params.email, params.rol)
+    .prepare(
+      `INSERT INTO usuarios (google_sub, email, password_hash, rol) VALUES (?, ?, ?, ?) RETURNING ${COLUMNAS_USUARIO}`
+    )
+    .bind(params.googleSub, normalizarEmail(params.email), params.passwordHash, params.rol)
     .first<Usuario>();
   if (!usuario) throw new Error("No se pudo crear el usuario");
   return usuario;

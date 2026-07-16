@@ -14,7 +14,7 @@ import { listarPlanesActivos, obtenerNegocio, crearSuscripcionPendiente, guardar
 import { crearClienteFlow as crearClienteFlowApi, urlRegistroTarjeta as urlRegistroTarjetaApi } from "../../lib/flow.ts";
 
 const usuario = Astro.locals.usuario;
-if (!usuario.negocio_id) {
+if (!usuario || !usuario.negocio_id) {
   return Astro.redirect("/onboarding");
 }
 const negocio = await obtenerNegocio(env.DB, usuario.negocio_id);

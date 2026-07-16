@@ -12,6 +12,9 @@ import { crearNegocio, vincularUsuarioANegocio } from "../lib/db.ts";
 import { validarNegocioForm, type NegocioFormValores } from "../lib/validacion.ts";
 
 const usuario = Astro.locals.usuario;
+if (!usuario) {
+  return Astro.redirect("/auth/login");
+}
 if (usuario.negocio_id) {
   return Astro.redirect(`/negocios/${usuario.negocio_id}/editar`);
 }
