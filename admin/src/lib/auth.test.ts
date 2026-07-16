@@ -17,4 +17,5 @@ test("construirUrlAutorizacion arma la URL de autorización de Google con los pa
   assert.equal(url.searchParams.get("response_type"), "code");
   assert.equal(url.searchParams.get("scope"), "openid email profile");
   assert.equal(url.searchParams.get("state"), "estado-abc");
+  assert.equal(url.searchParams.get("prompt"), "select_account");
 });

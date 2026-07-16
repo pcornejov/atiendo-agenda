@@ -18,6 +18,10 @@ export function construirUrlAutorizacion(params: {
   url.searchParams.set("response_type", "code");
   url.searchParams.set("scope", "openid email profile");
   url.searchParams.set("state", params.state);
+  // Sin esto, si el navegador ya tiene una sesión de Google activa, Google
+  // reautentica en silencio con la última cuenta usada y nunca muestra el
+  // selector — un problema real para probar con más de una cuenta de Google.
+  url.searchParams.set("prompt", "select_account");
   return url.toString();
 }
 
