@@ -75,8 +75,13 @@ export function formatearFallback(negocioNombre: string, sugerencias: string[]):
   return [`¡Hola! Soy el asistente de ${negocioNombre}.`, ...sugerencias].join(" ");
 }
 
-export function formatearMenu(items: Array<{ nombre: string; precio_clp: number }>): string {
-  const lineas = items.map((i) => `- ${i.nombre} — $${i.precio_clp.toLocaleString("es-CL")}`);
+export function formatearMenu(
+  items: Array<{ nombre: string; precio_clp: number; descripcion?: string | null }>
+): string {
+  const lineas = items.map((i) => {
+    const base = `- ${i.nombre} — $${i.precio_clp.toLocaleString("es-CL")}`;
+    return i.descripcion ? `${base} (${i.descripcion})` : base;
+  });
   return ["Este es nuestro menú:", ...lineas, "", "Dime qué quieres pedir y en qué cantidad."].join("\n");
 }
 
@@ -90,32 +95,48 @@ interface ItemResumen {
   precioUnitarioClp: number;
 }
 
+export type TipoEntrega = "retiro" | "despacho";
+
 function formatearLineasPedido(items: ItemResumen[]): string[] {
   return items.map((i) => `- ${i.cantidad}x ${i.nombre} — $${(i.cantidad * i.precioUnitarioClp).toLocaleString("es-CL")}`);
 }
 
-export function formatearResumenPedido(items: ItemResumen[], totalClp: number): string {
+function formatearTipoEntregaTexto(tipoEntrega: TipoEntrega): string {
+  return tipoEntrega === "retiro" ? "Retiro en el local" : "Despacho";
+}
+
+export function formatearSinItemsValidos(): string {
+  return "No reconocí ningún ítem de nuestro menú en tu mensaje. ¿Puedes decirme qué quieres pedir?";
+}
+
+export function formatearPreguntaTipoEntrega(): string {
+  return "¿Retiras el pedido en el local, o prefieres que te lo despachemos?";
+}
+
+export function formatearRepetirPreguntaTipoEntrega(): string {
+  return "No entendí tu respuesta. ¿Retiras el pedido en el local, o prefieres despacho?";
+}
+
+export function formatearResumenPedido(items: ItemResumen[], totalClp: number, tipoEntrega: TipoEntrega): string {
   return [
     "Tu pedido:",
     ...formatearLineasPedido(items),
     `Total: $${totalClp.toLocaleString("es-CL")}`,
+    formatearTipoEntregaTexto(tipoEntrega),
     "",
     "¿Confirmas el pedido?",
   ].join("\n");
 }
 
-export function formatearRepetirConfirmacionPedido(items: ItemResumen[], totalClp: number): string {
+export function formatearRepetirConfirmacionPedido(items: ItemResumen[], totalClp: number, tipoEntrega: TipoEntrega): string {
   return [
     "No entendí tu respuesta. Tu pedido pendiente es:",
     ...formatearLineasPedido(items),
     `Total: $${totalClp.toLocaleString("es-CL")}`,
+    formatearTipoEntregaTexto(tipoEntrega),
     "",
     "Responde \"sí\" para confirmar, o \"cancelar\" si ya no lo quieres.",
   ].join("\n");
-}
-
-export function formatearSinItemsValidos(): string {
-  return "No reconocí ningún ítem de nuestro menú en tu mensaje. ¿Puedes decirme qué quieres pedir?";
 }
 
 export function formatearPedidoConfirmado(pedidoId: number, totalClp: number): string {
@@ -130,7 +151,12 @@ export function formatearSinPedidoParaCancelar(): string {
   return "No encontré ningún pedido activo a tu nombre para cancelar.";
 }
 
-export function formatearMiPedido(pedido: { id: number; estado: string; total_clp: number }): string {
+export function formatearMiPedido(pedido: {
+  id: number;
+  estado: string;
+  total_clp: number;
+  tipo_entrega: TipoEntrega | null;
+}): string {
   const estados: Record<string, string> = {
     pendiente: "pendiente de confirmar",
     confirmado: "confirmado",
@@ -138,7 +164,8 @@ export function formatearMiPedido(pedido: { id: number; estado: string; total_cl
     listo: "listo para retirar/entregar",
   };
   const estadoTexto = estados[pedido.estado] ?? pedido.estado;
-  return `Tu pedido #${pedido.id} está ${estadoTexto}. Total: $${pedido.total_clp.toLocaleString("es-CL")}.`;
+  const entregaTexto = pedido.tipo_entrega ? ` (${formatearTipoEntregaTexto(pedido.tipo_entrega)})` : "";
+  return `Tu pedido #${pedido.id} está ${estadoTexto}${entregaTexto}. Total: $${pedido.total_clp.toLocaleString("es-CL")}.`;
 }
 
 export function formatearSinPedidoActivo(): string {

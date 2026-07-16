@@ -43,6 +43,7 @@ const pedidos = await listarPedidos(env.DB, negocioId);
           <th>Cliente</th>
           <th>Teléfono</th>
           <th>Total</th>
+          <th>Entrega</th>
           <th>Estado</th>
           <th></th>
         </tr>
@@ -54,6 +55,7 @@ const pedidos = await listarPedidos(env.DB, negocioId);
             <td>{p.cliente_nombre ?? "—"}</td>
             <td>{p.cliente_telefono}</td>
             <td>${p.total_clp.toLocaleString("es-CL")}</td>
+            <td>{p.tipo_entrega === "retiro" ? "Retiro" : p.tipo_entrega === "despacho" ? "Despacho" : "—"}</td>
             <td>{p.estado}</td>
             <td>
               <form class="inline" method="POST">

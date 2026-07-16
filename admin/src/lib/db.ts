@@ -407,6 +407,7 @@ export interface Pedido {
   cliente_nombre: string | null;
   estado: string;
   total_clp: number;
+  tipo_entrega: "retiro" | "despacho" | null;
   created_at: string;
 }
 
@@ -414,7 +415,7 @@ export interface Pedido {
 export async function listarPedidos(db: D1Database, negocioId: number): Promise<Pedido[]> {
   const resultado = await db
     .prepare(
-      `SELECT id, cliente_telefono, cliente_nombre, estado, total_clp, created_at
+      `SELECT id, cliente_telefono, cliente_nombre, estado, total_clp, tipo_entrega, created_at
        FROM pedidos WHERE negocio_id = ? AND estado != 'cancelado' ORDER BY created_at DESC`
     )
     .bind(negocioId)

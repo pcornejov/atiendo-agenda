@@ -1,15 +1,22 @@
-// Módulo de venta de comida (plan Nivel 2): ver menú, hacer un pedido,
-// confirmarlo, consultar su estado, cancelarlo. Mismo patrón que
-// agendamiento.ts: "ofrecer y luego pedir confirmación explícita" antes de
-// escribir nada en la base, para no crear un pedido por una mala
+// Módulo de venta de comida (plan Nivel 2): ver menú, hacer un pedido, elegir
+// retiro/despacho, confirmarlo, consultar su estado, cancelarlo. Mismo
+// patrón que agendamiento.ts: "ofrecer y luego pedir confirmación explícita"
+// antes de escribir nada en la base, para no crear un pedido por una mala
 // interpretación de Claude.
 
-import { interpretarPedido, interpretarConfirmacion, type SolicitudInterpretada } from "../nlu.ts";
+import {
+  interpretarPedido,
+  interpretarConfirmacion,
+  interpretarTipoEntrega,
+  type SolicitudInterpretada,
+} from "../nlu.ts";
 import { guardarEstado, limpiarEstado } from "../conversacion.ts";
 import { listarMenuDisponible, crearPedido, buscarPedidoActivo, cancelarPedidoActivo } from "../pedido.ts";
 import {
   formatearMenu,
   formatearSinMenu,
+  formatearPreguntaTipoEntrega,
+  formatearRepetirPreguntaTipoEntrega,
   formatearResumenPedido,
   formatearRepetirConfirmacionPedido,
   formatearSinItemsValidos,
@@ -18,10 +25,12 @@ import {
   formatearSinPedidoParaCancelar,
   formatearMiPedido,
   formatearSinPedidoActivo,
+  type TipoEntrega,
 } from "../mensajes.ts";
 import type { DefinicionModulo, ContextoModulo } from "./tipos.ts";
 
 const CODIGO = "pedidos";
+const ESTADO_ESPERANDO_TIPO_ENTREGA = "esperando_tipo_entrega";
 const ESTADO_ESPERANDO_CONFIRMACION = "esperando_confirmacion_pedido";
 const MINUTOS_EXPIRACION_ESTADO = 15;
 
@@ -32,9 +41,13 @@ interface ItemContexto {
   precioUnitarioClp: number;
 }
 
-interface ContextoPedidoPendiente {
+interface ContextoItemsPendientes {
   items: ItemContexto[];
   totalClp: number;
+}
+
+interface ContextoPedidoPendiente extends ContextoItemsPendientes {
+  tipoEntrega: TipoEntrega;
 }
 
 async function manejarIntent(solicitud: SolicitudInterpretada, ctx: ContextoModulo): Promise<boolean> {
@@ -106,11 +119,11 @@ async function manejarIntent(solicitud: SolicitudInterpretada, ctx: ContextoModu
       db,
       negocio.id,
       mensaje.clienteTelefono,
-      `${CODIGO}:${ESTADO_ESPERANDO_CONFIRMACION}`,
-      { items, totalClp } satisfies ContextoPedidoPendiente,
+      `${CODIGO}:${ESTADO_ESPERANDO_TIPO_ENTREGA}`,
+      { items, totalClp } satisfies ContextoItemsPendientes,
       new Date(ahoraUtc.getTime() + MINUTOS_EXPIRACION_ESTADO * 60000)
     );
-    await enviar(formatearResumenPedido(items, totalClp));
+    await enviar(formatearPreguntaTipoEntrega());
     return true;
   }
 
@@ -122,38 +135,67 @@ async function manejarEstadoPendiente(
   contexto: unknown,
   ctx: ContextoModulo
 ): Promise<void> {
-  if (estadoSinPrefijo !== ESTADO_ESPERANDO_CONFIRMACION) return;
+  const { db, claude, negocio, mensaje, ahoraUtc, enviar } = ctx;
 
-  const { db, claude, negocio, mensaje, enviar } = ctx;
-  const pendiente = contexto as ContextoPedidoPendiente;
+  if (estadoSinPrefijo === ESTADO_ESPERANDO_TIPO_ENTREGA) {
+    const pendiente = contexto as ContextoItemsPendientes;
+    const respuesta = await interpretarTipoEntrega(claude, { mensajeCliente: mensaje.texto });
 
-  const confirmacion = await interpretarConfirmacion(claude, { mensajeCliente: mensaje.texto });
+    if (respuesta.intent === "cancelar") {
+      await limpiarEstado(db, negocio.id, mensaje.clienteTelefono);
+      await enviar(formatearPedidoCancelado());
+      return;
+    }
 
-  if (confirmacion.intent === "cancelar") {
-    await limpiarEstado(db, negocio.id, mensaje.clienteTelefono);
-    await enviar(formatearPedidoCancelado());
+    if (respuesta.intent === "retiro" || respuesta.intent === "despacho") {
+      await guardarEstado(
+        db,
+        negocio.id,
+        mensaje.clienteTelefono,
+        `${CODIGO}:${ESTADO_ESPERANDO_CONFIRMACION}`,
+        { ...pendiente, tipoEntrega: respuesta.intent } satisfies ContextoPedidoPendiente,
+        new Date(ahoraUtc.getTime() + MINUTOS_EXPIRACION_ESTADO * 60000)
+      );
+      await enviar(formatearResumenPedido(pendiente.items, pendiente.totalClp, respuesta.intent));
+      return;
+    }
+
+    // "otro": no quedó claro — se repite la pregunta (el estado sigue vigente).
+    await enviar(formatearRepetirPreguntaTipoEntrega());
     return;
   }
 
-  if (confirmacion.intent === "confirmar") {
-    const resultado = await crearPedido(db, {
-      negocioId: negocio.id,
-      clienteTelefono: mensaje.clienteTelefono,
-      clienteNombre: mensaje.clienteNombrePerfil,
-      items: pendiente.items.map((item) => ({
-        menuItemId: item.menuItemId,
-        cantidad: item.cantidad,
-        precioUnitarioClp: item.precioUnitarioClp,
-      })),
-      totalClp: pendiente.totalClp,
-    });
-    await limpiarEstado(db, negocio.id, mensaje.clienteTelefono);
-    await enviar(formatearPedidoConfirmado(resultado.id, pendiente.totalClp));
-    return;
-  }
+  if (estadoSinPrefijo === ESTADO_ESPERANDO_CONFIRMACION) {
+    const pendiente = contexto as ContextoPedidoPendiente;
+    const confirmacion = await interpretarConfirmacion(claude, { mensajeCliente: mensaje.texto });
 
-  // "otro": no quedó claro — se repite el resumen (el estado sigue vigente).
-  await enviar(formatearRepetirConfirmacionPedido(pendiente.items, pendiente.totalClp));
+    if (confirmacion.intent === "cancelar") {
+      await limpiarEstado(db, negocio.id, mensaje.clienteTelefono);
+      await enviar(formatearPedidoCancelado());
+      return;
+    }
+
+    if (confirmacion.intent === "confirmar") {
+      const resultado = await crearPedido(db, {
+        negocioId: negocio.id,
+        clienteTelefono: mensaje.clienteTelefono,
+        clienteNombre: mensaje.clienteNombrePerfil,
+        items: pendiente.items.map((item) => ({
+          menuItemId: item.menuItemId,
+          cantidad: item.cantidad,
+          precioUnitarioClp: item.precioUnitarioClp,
+        })),
+        totalClp: pendiente.totalClp,
+        tipoEntrega: pendiente.tipoEntrega,
+      });
+      await limpiarEstado(db, negocio.id, mensaje.clienteTelefono);
+      await enviar(formatearPedidoConfirmado(resultado.id, pendiente.totalClp));
+      return;
+    }
+
+    // "otro": no quedó claro — se repite el resumen (el estado sigue vigente).
+    await enviar(formatearRepetirConfirmacionPedido(pendiente.items, pendiente.totalClp, pendiente.tipoEntrega));
+  }
 }
 
 export const moduloPedidos: DefinicionModulo = {

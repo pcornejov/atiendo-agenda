@@ -4,13 +4,14 @@
 export interface MenuItem {
   id: number;
   nombre: string;
+  descripcion: string | null;
   precio_clp: number;
 }
 
 export async function listarMenuDisponible(db: D1Database, negocioId: number): Promise<MenuItem[]> {
   const resultado = await db
     .prepare(
-      "SELECT id, nombre, precio_clp FROM menu_items WHERE negocio_id = ? AND disponible = 1 ORDER BY orden, nombre"
+      "SELECT id, nombre, descripcion, precio_clp FROM menu_items WHERE negocio_id = ? AND disponible = 1 ORDER BY orden, nombre"
     )
     .bind(negocioId)
     .all<MenuItem>();
@@ -37,14 +38,15 @@ export async function crearPedido(
     clienteNombre: string | null;
     items: ItemPedidoParaCrear[];
     totalClp: number;
+    tipoEntrega: "retiro" | "despacho";
   }
 ): Promise<{ id: number }> {
   const resultado = await db
     .prepare(
-      `INSERT INTO pedidos (negocio_id, cliente_telefono, cliente_nombre, estado, total_clp)
-       VALUES (?, ?, ?, 'pendiente', ?)`
+      `INSERT INTO pedidos (negocio_id, cliente_telefono, cliente_nombre, estado, total_clp, tipo_entrega)
+       VALUES (?, ?, ?, 'pendiente', ?, ?)`
     )
-    .bind(params.negocioId, params.clienteTelefono, params.clienteNombre, params.totalClp)
+    .bind(params.negocioId, params.clienteTelefono, params.clienteNombre, params.totalClp, params.tipoEntrega)
     .run();
   const pedidoId = resultado.meta.last_row_id;
 
@@ -67,6 +69,7 @@ export interface PedidoActivo {
   id: number;
   estado: string;
   total_clp: number;
+  tipo_entrega: "retiro" | "despacho" | null;
   creado_en: string;
 }
 
@@ -78,7 +81,7 @@ export async function buscarPedidoActivo(
 ): Promise<PedidoActivo | null> {
   const pedido = await db
     .prepare(
-      `SELECT id, estado, total_clp, created_at AS creado_en FROM pedidos
+      `SELECT id, estado, total_clp, tipo_entrega, created_at AS creado_en FROM pedidos
        WHERE negocio_id = ? AND cliente_telefono = ? AND estado IN ('pendiente', 'confirmado', 'preparando', 'listo')
        ORDER BY created_at DESC LIMIT 1`
     )

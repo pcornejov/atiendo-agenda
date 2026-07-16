@@ -14,6 +14,8 @@ import {
   formatearRepetirConfirmacionPedido,
   formatearPedidoConfirmado,
   formatearMiPedido,
+  formatearPreguntaTipoEntrega,
+  formatearRepetirPreguntaTipoEntrega,
 } from "./mensajes.ts";
 import type { SlotDisponible } from "./disponibilidad.ts";
 
@@ -68,6 +70,11 @@ test("formatearMenu lista los ítems con precio formateado en CLP", () => {
   assert.match(texto, /Bebida 350ml — \$1\.200/);
 });
 
+test("formatearMenu incluye la descripción del ítem cuando existe", () => {
+  const texto = formatearMenu([{ nombre: "Bebida 350ml", precio_clp: 1200, descripcion: "Coca-Cola, Sprite o Fanta" }]);
+  assert.match(texto, /Bebida 350ml — \$1\.200 \(Coca-Cola, Sprite o Fanta\)/);
+});
+
 test("formatearSinMenu no lanza y devuelve texto no vacío", () => {
   assert.ok(formatearSinMenu().length > 0);
 });
@@ -77,17 +84,19 @@ const ITEMS_PEDIDO = [
   { nombre: "Bebida 350ml", cantidad: 1, precioUnitarioClp: 1200 },
 ];
 
-test("formatearResumenPedido incluye cada ítem, su subtotal, y el total", () => {
-  const texto = formatearResumenPedido(ITEMS_PEDIDO, 5200);
+test("formatearResumenPedido incluye cada ítem, su subtotal, el total, y el tipo de entrega", () => {
+  const texto = formatearResumenPedido(ITEMS_PEDIDO, 5200, "retiro");
   assert.match(texto, /2x Empanada de pino — \$4\.000/);
   assert.match(texto, /1x Bebida 350ml — \$1\.200/);
   assert.match(texto, /Total: \$5\.200/);
+  assert.match(texto, /Retiro en el local/);
 });
 
-test("formatearRepetirConfirmacionPedido incluye el resumen del pedido pendiente", () => {
-  const texto = formatearRepetirConfirmacionPedido(ITEMS_PEDIDO, 5200);
+test("formatearRepetirConfirmacionPedido incluye el resumen del pedido pendiente y el despacho", () => {
+  const texto = formatearRepetirConfirmacionPedido(ITEMS_PEDIDO, 5200, "despacho");
   assert.match(texto, /2x Empanada de pino/);
   assert.match(texto, /Total: \$5\.200/);
+  assert.match(texto, /Despacho/);
 });
 
 test("formatearPedidoConfirmado incluye el id del pedido y el total", () => {
@@ -96,9 +105,20 @@ test("formatearPedidoConfirmado incluye el id del pedido y el total", () => {
   assert.match(texto, /\$5\.200/);
 });
 
-test("formatearMiPedido traduce el estado interno a un texto legible", () => {
-  const texto = formatearMiPedido({ id: 7, estado: "preparando", total_clp: 3000 });
+test("formatearMiPedido traduce el estado interno a un texto legible e incluye el tipo de entrega", () => {
+  const texto = formatearMiPedido({ id: 7, estado: "preparando", total_clp: 3000, tipo_entrega: "despacho" });
   assert.match(texto, /#7/);
   assert.match(texto, /en preparación/);
+  assert.match(texto, /Despacho/);
   assert.match(texto, /\$3\.000/);
+});
+
+test("formatearMiPedido no falla si tipo_entrega es null", () => {
+  const texto = formatearMiPedido({ id: 7, estado: "pendiente", total_clp: 3000, tipo_entrega: null });
+  assert.match(texto, /#7/);
+});
+
+test("formatearPreguntaTipoEntrega y formatearRepetirPreguntaTipoEntrega no lanzan y devuelven texto no vacío", () => {
+  assert.ok(formatearPreguntaTipoEntrega().length > 0);
+  assert.ok(formatearRepetirPreguntaTipoEntrega().length > 0);
 });

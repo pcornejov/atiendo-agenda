@@ -361,3 +361,50 @@ export async function interpretarConfirmacion(
   const intentsValidos: readonly IntentConfirmacion[] = ["confirmar", "cancelar", "otro"];
   return { intent: intentsValidos.includes(input.intent as IntentConfirmacion) ? (input.intent as IntentConfirmacion) : "otro" };
 }
+
+export type TipoEntrega = "retiro" | "despacho" | "cancelar" | "otro";
+
+const TOOL_INTERPRETAR_TIPO_ENTREGA: Anthropic.Tool = {
+  name: "interpretar_tipo_entrega",
+  description:
+    "El negocio le preguntó al cliente si va a retirar su pedido en el local o si prefiere que se lo despachen. Interpreta la respuesta.",
+  input_schema: {
+    type: "object",
+    properties: {
+      intent: {
+        type: "string",
+        enum: ["retiro", "despacho", "cancelar", "otro"],
+        description:
+          "'retiro' si el cliente va a pasar a buscarlo. 'despacho' si quiere que se lo lleven/envíen. 'cancelar' si en este punto prefiere cancelar el pedido. 'otro' si no queda claro.",
+      },
+    },
+    required: ["intent"],
+  },
+};
+
+/** Interpreta si el cliente eligió retiro en el local o despacho. */
+export async function interpretarTipoEntrega(
+  client: ClienteClaude,
+  params: { mensajeCliente: string }
+): Promise<{ intent: TipoEntrega }> {
+  const respuesta = await client.messages.create({
+    model: MODELO_HAIKU,
+    max_tokens: 128,
+    system:
+      "Eres el asistente de un negocio de comida. Le preguntaste al cliente si retira su pedido en el local o si prefiere despacho. El cliente respondió por WhatsApp — interpreta su respuesta usando la herramienta interpretar_tipo_entrega.",
+    messages: [{ role: "user", content: params.mensajeCliente }],
+    tools: [TOOL_INTERPRETAR_TIPO_ENTREGA],
+    tool_choice: { type: "tool", name: "interpretar_tipo_entrega" },
+  });
+
+  const bloque = respuesta.content.find(
+    (b): b is { type: "tool_use"; name: string; input: unknown } => b.type === "tool_use"
+  );
+  if (!bloque || typeof bloque.input !== "object" || bloque.input === null) {
+    return { intent: "otro" };
+  }
+
+  const input = bloque.input as Record<string, unknown>;
+  const intentsValidos: readonly TipoEntrega[] = ["retiro", "despacho", "cancelar", "otro"];
+  return { intent: intentsValidos.includes(input.intent as TipoEntrega) ? (input.intent as TipoEntrega) : "otro" };
+}

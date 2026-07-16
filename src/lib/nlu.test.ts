@@ -6,6 +6,7 @@ import {
   interpretarSeleccion,
   interpretarPedido,
   interpretarConfirmacion,
+  interpretarTipoEntrega,
   type ClienteClaude,
 } from "./nlu.ts";
 
@@ -245,6 +246,23 @@ test("interpretarConfirmacion: mapea 'confirmar'/'cancelar'/'otro'", async () =>
 
   const otro = await interpretarConfirmacion(clienteFalso({ intent: "algo_invalido" }), {
     mensajeCliente: "eh?",
+  });
+  assert.deepEqual(otro, { intent: "otro" });
+});
+
+test("interpretarTipoEntrega: mapea 'retiro'/'despacho'/'otro'", async () => {
+  const retiro = await interpretarTipoEntrega(clienteFalso({ intent: "retiro" }), {
+    mensajeCliente: "paso a buscarlo yo",
+  });
+  assert.deepEqual(retiro, { intent: "retiro" });
+
+  const despacho = await interpretarTipoEntrega(clienteFalso({ intent: "despacho" }), {
+    mensajeCliente: "mándamelo a mi casa porfa",
+  });
+  assert.deepEqual(despacho, { intent: "despacho" });
+
+  const otro = await interpretarTipoEntrega(clienteFalso({ intent: "algo_invalido" }), {
+    mensajeCliente: "no sé",
   });
   assert.deepEqual(otro, { intent: "otro" });
 });
