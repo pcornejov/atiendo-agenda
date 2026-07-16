@@ -5,9 +5,10 @@
 import type { APIRoute } from "astro";
 import { env } from "cloudflare:workers";
 import Anthropic from "@anthropic-ai/sdk";
-import { extraerItemsDeCarta, type ArchivoCarta, type MediaTypeImagen } from "../../../lib/menu-parser.ts";
+import { extraerItemsDeCarta, extraerTextoDeExcel, type ArchivoCarta, type MediaTypeImagen } from "../../../lib/menu-parser.ts";
 
 const TIPOS_IMAGEN_VALIDOS = new Set<MediaTypeImagen>(["image/jpeg", "image/png", "image/gif", "image/webp"]);
+const TIPO_EXCEL = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 // Anthropic limita el request a 32MB (ya codificado en base64, que infla ~33%
 // el tamaño original) — 15MB de archivos originales en total da margen.
 const TAMANO_MAXIMO_TOTAL_BYTES = 15 * 1024 * 1024;
@@ -31,16 +32,22 @@ export const POST: APIRoute = async ({ request, redirect, session, locals }) => 
   }
 
   const archivos: ArchivoCarta[] = [];
-  for (const archivo of archivosSubidos) {
-    const buffer = await archivo.arrayBuffer();
-    const base64 = Buffer.from(buffer).toString("base64");
-    if (archivo.type === "application/pdf") {
-      archivos.push({ tipo: "pdf", base64 });
-    } else if (TIPOS_IMAGEN_VALIDOS.has(archivo.type as MediaTypeImagen)) {
-      archivos.push({ tipo: "imagen", mediaType: archivo.type as MediaTypeImagen, base64 });
+  try {
+    for (const archivo of archivosSubidos) {
+      const buffer = await archivo.arrayBuffer();
+      if (archivo.type === "application/pdf") {
+        archivos.push({ tipo: "pdf", base64: Buffer.from(buffer).toString("base64") });
+      } else if (TIPOS_IMAGEN_VALIDOS.has(archivo.type as MediaTypeImagen)) {
+        archivos.push({ tipo: "imagen", mediaType: archivo.type as MediaTypeImagen, base64: Buffer.from(buffer).toString("base64") });
+      } else if (archivo.type === TIPO_EXCEL || archivo.name.toLowerCase().endsWith(".xlsx")) {
+        archivos.push({ tipo: "texto", contenido: extraerTextoDeExcel(buffer) });
+      }
+      // Otros tipos de archivo (ej. .docx) se ignoran silenciosamente — el
+      // input del formulario ya filtra con accept="image/*,application/pdf,.xlsx".
     }
-    // Otros tipos de archivo (ej. .docx) se ignoran silenciosamente — el
-    // input del formulario ya filtra con accept="image/*,application/pdf".
+  } catch (error) {
+    console.error("Error leyendo un archivo de la carta:", error);
+    return redirect("/onboarding/menu?error=fallo_lectura");
   }
 
   if (archivos.length === 0) {

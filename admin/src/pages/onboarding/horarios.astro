@@ -7,8 +7,9 @@ import {
   crearHorario,
   eliminarHorario,
   obtenerCodigoPlanDelNegocio,
+  actualizarNegocio,
 } from "../../lib/db.ts";
-import { esRangoHorarioValido } from "../../lib/validacion.ts";
+import { esRangoHorarioValido, validarNegocioForm, type NegocioFormValores } from "../../lib/validacion.ts";
 import { nombreDiaSemana } from "../../lib/tz.ts";
 
 const usuario = Astro.locals.usuario;
@@ -21,6 +22,10 @@ const negocio = await obtenerNegocio(env.DB, negocioId);
 if (!negocio) return Astro.redirect("/onboarding");
 
 let error: string | null = null;
+let valoresServicio = {
+  servicio_nombre: negocio.servicio_nombre,
+  duracion_minutos: String(negocio.duracion_minutos),
+};
 
 if (Astro.request.method === "POST") {
   const form = await Astro.request.formData();
@@ -33,7 +38,26 @@ if (Astro.request.method === "POST") {
     return Astro.redirect(codigoPlan === "nivel2" ? "/onboarding/menu" : "/onboarding/listo");
   }
 
-  if (accion === "eliminar") {
+  if (accion === "guardar_datos") {
+    valoresServicio = {
+      servicio_nombre: String(form.get("servicio_nombre") ?? ""),
+      duracion_minutos: String(form.get("duracion_minutos") ?? ""),
+    };
+    const valoresCompletos: NegocioFormValores = {
+      nombre: negocio.nombre,
+      telefono_whatsapp: negocio.telefono_whatsapp,
+      whatsapp_phone_number_id: negocio.whatsapp_phone_number_id,
+      servicio_nombre: valoresServicio.servicio_nombre,
+      duracion_minutos: valoresServicio.duracion_minutos,
+      timezone: negocio.timezone,
+    };
+    const validacion = validarNegocioForm(valoresCompletos);
+    if (validacion.ok) {
+      await actualizarNegocio(env.DB, negocioId, validacion.datos);
+      return Astro.redirect("/onboarding/horarios");
+    }
+    error = validacion.errores.join(" ");
+  } else if (accion === "eliminar") {
     const horarioId = Number(form.get("horario_id"));
     if (horarioId) await eliminarHorario(env.DB, negocioId, horarioId);
   } else {
@@ -55,9 +79,27 @@ const horarios = await listarHorarios(env.DB, negocioId);
 ---
 
 <WizardLayout title="Horarios de atención" paso={5}>
-  <p>¿Cuándo atiende <strong>{negocio.nombre}</strong>? Se puede agregar más de un horario.</p>
+  <p>Termina de configurar cómo agenda <strong>{negocio.nombre}</strong>.</p>
 
   {error && <div class="error">{error}</div>}
+
+  <h2>Datos del servicio</h2>
+  <p>Esto define cómo calculamos los horarios disponibles que el bot ofrece a tus clientes.</p>
+  <form method="POST" class="form-grid">
+    <input type="hidden" name="_accion" value="guardar_datos" />
+    <label>
+      Servicio
+      <input type="text" name="servicio_nombre" value={valoresServicio.servicio_nombre} required />
+    </label>
+    <label>
+      Duración del servicio (minutos)
+      <input type="number" name="duracion_minutos" value={valoresServicio.duracion_minutos} min="1" required />
+    </label>
+    <button type="submit">Guardar</button>
+  </form>
+
+  <h2>Horarios de atención</h2>
+  <p>¿Cuándo atiende <strong>{negocio.nombre}</strong>? Se puede agregar más de un horario.</p>
 
   {horarios.length > 0 && (
     <table>

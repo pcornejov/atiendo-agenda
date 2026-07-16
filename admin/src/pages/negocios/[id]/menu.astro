@@ -25,7 +25,7 @@ const volverUrl = usuario.rol === "admin" ? "/admin/negocios" : `/negocios/${neg
 const ERRORES_SUBIDA: Record<string, string> = {
   sin_archivos: "No se recibió ningún archivo.",
   archivos_muy_grandes: "Los archivos son muy pesados en conjunto (máximo 15MB en total). Prueba con menos fotos o de menor resolución.",
-  formato_no_soportado: "El formato del archivo no es compatible — solo fotos (JPG, PNG, GIF, WEBP) o PDF.",
+  formato_no_soportado: "El formato del archivo no es compatible — solo fotos (JPG, PNG, GIF, WEBP), PDF o Excel (.xlsx).",
   no_se_reconocieron_items: "No pudimos reconocer ítems en ese archivo. Prueba con una foto más clara o cárgalos manualmente.",
   fallo_lectura: "Hubo un problema leyendo la carta. Intenta de nuevo en unos minutos.",
 };
@@ -111,10 +111,16 @@ const menu = await listarMenu(env.DB, negocioId);
     </table>
   )}
 
-  <h2>Subir la carta (foto o PDF)</h2>
-  <p>Sube una o más fotos de la carta, o un PDF, y creamos los ítems automáticamente.</p>
+  <h2>Subir la carta (foto, PDF o Excel)</h2>
+  <p>Sube una o más fotos de la carta, un PDF, o una planilla Excel, y creamos los ítems automáticamente.</p>
   <form method="POST" enctype="multipart/form-data" action={`/negocios/${negocioId}/menu/subir`}>
-    <input type="file" name="archivos" accept="image/*,application/pdf" multiple required />
+    <input
+      type="file"
+      name="archivos"
+      accept="image/*,application/pdf,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      multiple
+      required
+    />
     <button type="submit">Leer carta</button>
   </form>
 

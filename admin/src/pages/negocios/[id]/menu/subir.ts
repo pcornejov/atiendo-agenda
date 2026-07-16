@@ -3,10 +3,11 @@
 import type { APIRoute } from "astro";
 import { env } from "cloudflare:workers";
 import Anthropic from "@anthropic-ai/sdk";
-import { extraerItemsDeCarta, type ArchivoCarta, type MediaTypeImagen } from "../../../../lib/menu-parser.ts";
+import { extraerItemsDeCarta, extraerTextoDeExcel, type ArchivoCarta, type MediaTypeImagen } from "../../../../lib/menu-parser.ts";
 import { puedeAdministrarNegocio } from "../../../../lib/autorizacion.ts";
 
 const TIPOS_IMAGEN_VALIDOS = new Set<MediaTypeImagen>(["image/jpeg", "image/png", "image/gif", "image/webp"]);
+const TIPO_EXCEL = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const TAMANO_MAXIMO_TOTAL_BYTES = 15 * 1024 * 1024;
 
 export const POST: APIRoute = async ({ request, redirect, session, locals, params }) => {
@@ -28,14 +29,20 @@ export const POST: APIRoute = async ({ request, redirect, session, locals, param
   }
 
   const archivos: ArchivoCarta[] = [];
-  for (const archivo of archivosSubidos) {
-    const buffer = await archivo.arrayBuffer();
-    const base64 = Buffer.from(buffer).toString("base64");
-    if (archivo.type === "application/pdf") {
-      archivos.push({ tipo: "pdf", base64 });
-    } else if (TIPOS_IMAGEN_VALIDOS.has(archivo.type as MediaTypeImagen)) {
-      archivos.push({ tipo: "imagen", mediaType: archivo.type as MediaTypeImagen, base64 });
+  try {
+    for (const archivo of archivosSubidos) {
+      const buffer = await archivo.arrayBuffer();
+      if (archivo.type === "application/pdf") {
+        archivos.push({ tipo: "pdf", base64: Buffer.from(buffer).toString("base64") });
+      } else if (TIPOS_IMAGEN_VALIDOS.has(archivo.type as MediaTypeImagen)) {
+        archivos.push({ tipo: "imagen", mediaType: archivo.type as MediaTypeImagen, base64: Buffer.from(buffer).toString("base64") });
+      } else if (archivo.type === TIPO_EXCEL || archivo.name.toLowerCase().endsWith(".xlsx")) {
+        archivos.push({ tipo: "texto", contenido: extraerTextoDeExcel(buffer) });
+      }
     }
+  } catch (error) {
+    console.error("Error leyendo un archivo de la carta:", error);
+    return redirect(`/negocios/${negocioId}/menu?error=fallo_lectura`);
   }
 
   if (archivos.length === 0) {

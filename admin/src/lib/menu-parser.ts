@@ -8,6 +8,7 @@
 // llamada" y "validar/sanear la respuesta".
 
 import type Anthropic from "@anthropic-ai/sdk";
+import * as XLSX from "xlsx";
 
 export interface ClienteClaude {
   messages: {
@@ -28,7 +29,8 @@ export type MediaTypeImagen = "image/jpeg" | "image/png" | "image/gif" | "image/
 
 export type ArchivoCarta =
   | { tipo: "imagen"; mediaType: MediaTypeImagen; base64: string }
-  | { tipo: "pdf"; base64: string };
+  | { tipo: "pdf"; base64: string }
+  | { tipo: "texto"; contenido: string };
 
 export interface ItemMenuExtraido {
   nombre: string;
@@ -65,16 +67,30 @@ const TOOL_EXTRAER_ITEMS: Anthropic.Tool = {
 };
 
 function construirContentBlocks(archivos: ArchivoCarta[]): Anthropic.ContentBlockParam[] {
-  const bloques: Anthropic.ContentBlockParam[] = archivos.map((archivo) =>
-    archivo.tipo === "imagen"
-      ? { type: "image", source: { type: "base64", media_type: archivo.mediaType, data: archivo.base64 } }
-      : { type: "document", source: { type: "base64", media_type: "application/pdf", data: archivo.base64 } }
-  );
+  const bloques: Anthropic.ContentBlockParam[] = archivos.map((archivo) => {
+    if (archivo.tipo === "imagen") {
+      return { type: "image", source: { type: "base64", media_type: archivo.mediaType, data: archivo.base64 } };
+    }
+    if (archivo.tipo === "pdf") {
+      return { type: "document", source: { type: "base64", media_type: "application/pdf", data: archivo.base64 } };
+    }
+    return { type: "text", text: archivo.contenido };
+  });
   bloques.push({
     type: "text",
     text: "Esta es la carta/menú de un negocio. Extrae todos los ítems que puedas leer usando la herramienta extraer_items_menu.",
   });
   return bloques;
+}
+
+/**
+ * Convierte un archivo Excel (.xlsx) a texto plano tipo CSV, una hoja tras
+ * otra — Claude lee esto igual de bien que una tabla en imagen/PDF, y evita
+ * tener que mandar el archivo binario en la llamada a la API.
+ */
+export function extraerTextoDeExcel(buffer: ArrayBuffer): string {
+  const libro = XLSX.read(buffer, { type: "array" });
+  return libro.SheetNames.map((nombreHoja) => XLSX.utils.sheet_to_csv(libro.Sheets[nombreHoja])).join("\n");
 }
 
 /** Lee una o más fotos/PDF de una carta y devuelve los ítems que Claude pudo extraer, ya validados. */
