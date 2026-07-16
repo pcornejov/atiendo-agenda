@@ -54,7 +54,7 @@ if (Astro.request.method === "POST") {
 const horarios = await listarHorarios(env.DB, negocioId);
 ---
 
-<WizardLayout title="Horarios de atención" paso={4}>
+<WizardLayout title="Horarios de atención" paso={5}>
   <p>¿Cuándo atiende <strong>{negocio.nombre}</strong>? Se puede agregar más de un horario.</p>
 
   {error && <div class="error">{error}</div>}

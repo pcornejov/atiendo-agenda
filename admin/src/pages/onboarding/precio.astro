@@ -32,7 +32,7 @@ if (Astro.request.method === "POST") {
   const form = await Astro.request.formData();
   if (String(form.get("_accion") ?? "") === "contratar") {
     await asignarPlanManual(env.DB, negocioId, plan.id);
-    return Astro.redirect("/onboarding/horarios");
+    return Astro.redirect("/onboarding/whatsapp");
   }
   error = "Hubo un problema al procesar tu elección. Intenta de nuevo.";
 }

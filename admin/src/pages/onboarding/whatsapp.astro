@@ -1,0 +1,102 @@
+---
+// Pantalla informativa, no un formulario funcional: conectar el número de
+// WhatsApp de un negocio nuevo todavía requiere un paso manual del equipo de
+// Atiendo Agenda en Meta Business Manager (alta de la app, verificación del
+// WABA) — ver la limitación documentada en README.md. Acá solo se explica
+// qué va a pasar y qué tiene que tener a mano el dueño; "Continuar" no activa
+// nada, solo avanza al siguiente paso del wizard.
+import WizardLayout from "../../layouts/WizardLayout.astro";
+import { env } from "cloudflare:workers";
+import { obtenerCodigoPlanDelNegocio } from "../../lib/db.ts";
+
+const usuario = Astro.locals.usuario;
+if (usuario.rol !== "dueno" || !usuario.negocio_id) {
+  return Astro.redirect(usuario.rol === "admin" ? "/admin/negocios" : "/onboarding");
+}
+
+const codigoPlan = await obtenerCodigoPlanDelNegocio(env.DB, usuario.negocio_id);
+if (!codigoPlan) return Astro.redirect("/onboarding/servicio");
+
+if (Astro.request.method === "POST") {
+  return Astro.redirect("/onboarding/horarios");
+}
+---
+
+<WizardLayout title="Conecta tu WhatsApp" paso={4}>
+  <p>
+    Tu plan ya está activo. Lo único que falta es conectar el número de WhatsApp de tu negocio —
+    hoy ese paso lo hacemos <strong>nosotros, a mano</strong>, así que nuestro equipo se va a
+    contactar contigo a <strong>{usuario.email}</strong> para coordinarlo.
+  </p>
+
+  <h2>Qué vas a necesitar</h2>
+  <ul class="checklist">
+    <li>
+      <span class="marca">1</span>
+      <div>
+        <strong>Un número de teléfono para el bot.</strong>
+        <p>No puede ser un número que ya uses en la app de WhatsApp normal o Business — hay que
+        liberarlo primero, o usar uno nuevo dedicado a tu negocio.</p>
+      </div>
+    </li>
+    <li>
+      <span class="marca">2</span>
+      <div>
+        <strong>Acceso a Facebook Business Manager de tu negocio.</strong>
+        <p>Lo vamos a necesitar para verificar tu cuenta de WhatsApp Business — si no tienes uno,
+        te ayudamos a crearlo.</p>
+      </div>
+    </li>
+    <li>
+      <span class="marca">3</span>
+      <div>
+        <strong>Un poco de paciencia.</strong>
+        <p>La verificación de Meta puede tardar algunos días — mientras tanto puedes seguir
+        completando la configuración de tu negocio.</p>
+      </div>
+    </li>
+  </ul>
+
+  <form method="POST">
+    <button type="submit">Continuar</button>
+  </form>
+</WizardLayout>
+
+<style>
+  .checklist {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1.75rem;
+    display: grid;
+    gap: 1rem;
+    max-width: 560px;
+  }
+  .checklist li {
+    display: flex;
+    gap: 0.85rem;
+    align-items: flex-start;
+    padding: 0.9rem 1.1rem;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface);
+  }
+  .marca {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.7em;
+    height: 1.7em;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-size: 0.85rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .checklist p {
+    margin: 0.25rem 0 0;
+    color: var(--ink-muted);
+    font-size: 0.9rem;
+  }
+</style>

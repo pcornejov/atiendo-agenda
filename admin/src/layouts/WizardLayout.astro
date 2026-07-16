@@ -3,10 +3,10 @@ import Layout from "./Layout.astro";
 
 interface Props {
   title: string;
-  paso: 1 | 2 | 3 | 4 | 5;
+  paso: 1 | 2 | 3 | 4 | 5 | 6;
 }
 const { title, paso } = Astro.props;
-const NOMBRES_PASO = ["Negocio", "Servicio", "Precio", "Configuración", "Listo"];
+const NOMBRES_PASO = ["Negocio", "Servicio", "Precio", "WhatsApp", "Configuración", "Listo"];
 ---
 
 <Layout title={title}>

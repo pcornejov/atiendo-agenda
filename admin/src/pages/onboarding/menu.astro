@@ -53,7 +53,7 @@ if (Astro.request.method === "POST") {
 const menu = await listarMenu(env.DB, negocioId);
 ---
 
-<WizardLayout title="Menú" paso={4}>
+<WizardLayout title="Menú" paso={5}>
   <p>
     Este paso es opcional — si <strong>{negocio.nombre}</strong> no vende comida, puedes continuar
     directamente al siguiente paso.
