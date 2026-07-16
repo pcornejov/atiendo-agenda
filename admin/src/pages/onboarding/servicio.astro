@@ -20,6 +20,53 @@ if (Astro.request.method === "POST") {
   }
   error = "Elige uno de los dos servicios para continuar.";
 }
+
+interface Mensaje {
+  de: "cliente" | "bot";
+  texto: string;
+}
+
+// Transcripciones armadas con el texto exacto que hoy produce el bot
+// (src/lib/mensajes.ts del proyecto del bot — formatearOfertaHorarios,
+// formatearConfirmacion, formatearMenu, formatearPreguntaTipoEntrega,
+// formatearResumenPedido, formatearPedidoConfirmado), con datos de ejemplo.
+// Así la demo no promete nada que el bot no diga de verdad.
+const DEMO_AGENDA: Mensaje[] = [
+  { de: "cliente", texto: "Hola! quiero pedir hora para corte de pelo" },
+  {
+    de: "bot",
+    texto:
+      "Tengo estos horarios disponibles para Corte de pelo:\n1) jueves 16/07 10:00\n2) jueves 16/07 11:30\n3) viernes 17/07 09:00\n\nResponde con el número de la opción que prefieras.",
+  },
+  { de: "cliente", texto: "2" },
+  {
+    de: "bot",
+    texto:
+      "¡Listo! Quedaste agendado para Corte de pelo el jueves 16/07 11:30. Te voy a escribir 1 hora antes para recordarte.",
+  },
+];
+
+const DEMO_COMIDA: Mensaje[] = [
+  { de: "cliente", texto: "Hola, quiero ver la carta" },
+  {
+    de: "bot",
+    texto:
+      "Este es nuestro menú:\n- Empanada de pino — $1.800\n- Completo italiano — $2.500\n- Bebida 350cc — $1.200\n\nDime qué quieres pedir y en qué cantidad.",
+  },
+  { de: "cliente", texto: "2 empanadas de pino y una bebida" },
+  { de: "bot", texto: "¿Retiras el pedido en el local, o prefieres que te lo despachemos?" },
+  { de: "cliente", texto: "Retiro" },
+  {
+    de: "bot",
+    texto:
+      "Tu pedido:\n- 2x Empanada de pino — $3.600\n- 1x Bebida 350cc — $1.200\nTotal: $4.800\nRetiro en el local\n\n¿Confirmas el pedido?",
+  },
+  { de: "cliente", texto: "Sí" },
+  {
+    de: "bot",
+    texto: "¡Listo! Tu pedido #482 quedó confirmado por un total de $4.800. Te avisamos cuando esté listo.",
+  },
+];
 ---
 
 <WizardLayout title="Elige tu servicio" paso={2}>
@@ -30,35 +77,60 @@ if (Astro.request.method === "POST") {
 
   {error && <div class="error">{error}</div>}
 
-  <form method="POST" class="tarjetas-servicio">
-    <label class="tarjeta-servicio">
-      <input type="radio" name="servicio" value="agenda" required />
-      <div>
-        <h3>Agenda de horas</h3>
-        <p>
-          Tus clientes reservan, consultan y cancelan horas por WhatsApp, sin llamadas ni idas y
-          vueltas.
-        </p>
+  <div class="paso-servicio">
+    <form method="POST" class="tarjetas-servicio">
+      <label class="tarjeta-servicio">
+        <input type="radio" name="servicio" value="agenda" required />
+        <div>
+          <h3>Agenda de horas</h3>
+          <p>
+            Tus clientes reservan, consultan y cancelan horas por WhatsApp, sin llamadas ni idas y
+            vueltas.
+          </p>
+        </div>
+      </label>
+      <label class="tarjeta-servicio">
+        <input type="radio" name="servicio" value="comida" />
+        <div>
+          <h3>Venta de comida</h3>
+          <p>
+            Tus clientes ven la carta y hacen pedidos por WhatsApp, con retiro o despacho.
+          </p>
+        </div>
+      </label>
+
+      <div class="demo-panel" aria-hidden="true">
+        <p class="demo-titulo">Así conversa tu bot</p>
+        <div class="demo-chat demo-agenda">
+          {DEMO_AGENDA.map((m, i) => (
+            <div class={`burbuja burbuja-${m.de}`} style={`animation-delay: ${0.15 + i * 0.55}s`}>
+              {m.texto}
+            </div>
+          ))}
+        </div>
+        <div class="demo-chat demo-comida">
+          {DEMO_COMIDA.map((m, i) => (
+            <div class={`burbuja burbuja-${m.de}`} style={`animation-delay: ${0.15 + i * 0.55}s`}>
+              {m.texto}
+            </div>
+          ))}
+        </div>
       </div>
-    </label>
-    <label class="tarjeta-servicio">
-      <input type="radio" name="servicio" value="comida" />
-      <div>
-        <h3>Venta de comida</h3>
-        <p>
-          Tus clientes ven la carta y hacen pedidos por WhatsApp, con retiro o despacho.
-        </p>
-      </div>
-    </label>
-    <button type="submit">Continuar</button>
-  </form>
+
+      <button type="submit">Continuar</button>
+    </form>
+  </div>
 </WizardLayout>
 
 <style>
+  .paso-servicio {
+    max-width: 900px;
+  }
   .tarjetas-servicio {
     display: grid;
     gap: 1rem;
-    max-width: 560px;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
   }
   .tarjeta-servicio {
     display: flex;
@@ -91,5 +163,90 @@ if (Astro.request.method === "POST") {
     margin: 0;
     font-size: 0.9rem;
     color: var(--ink-muted);
+  }
+
+  /* Panel de demo: ocupa su propia fila en mobile, columna aparte en desktop. */
+  .demo-panel {
+    grid-column: 1;
+    padding: 1rem 1rem 1.1rem;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--paper);
+  }
+  .demo-titulo {
+    margin: 0 0 0.7rem;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ink-muted);
+    font-weight: 600;
+  }
+  .demo-chat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .demo-comida {
+    display: none;
+  }
+  .tarjetas-servicio:has(input[value="comida"]:checked) .demo-agenda {
+    display: none;
+  }
+  .tarjetas-servicio:has(input[value="comida"]:checked) .demo-comida {
+    display: flex;
+  }
+
+  .burbuja {
+    max-width: 82%;
+    padding: 0.5rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    white-space: pre-line;
+    opacity: 0;
+    animation: burbuja-entra 0.4s ease both;
+  }
+  .burbuja-cliente {
+    align-self: flex-end;
+    background: color-mix(in srgb, var(--accent) 20%, var(--surface));
+    color: var(--ink);
+    border-bottom-right-radius: 3px;
+  }
+  .burbuja-bot {
+    align-self: flex-start;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-bottom-left-radius: 3px;
+  }
+
+  @keyframes burbuja-entra {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .burbuja {
+      animation: none;
+      opacity: 1;
+    }
+  }
+
+  @media (min-width: 720px) {
+    .tarjetas-servicio {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+    .demo-panel {
+      grid-column: 2;
+      grid-row: 1 / 3;
+    }
+    button[type="submit"] {
+      grid-column: 1 / 2;
+    }
   }
 </style>
