@@ -1,0 +1,56 @@
+---
+import Layout from "./Layout.astro";
+
+interface Props {
+  title: string;
+  paso: 1 | 2 | 3 | 4;
+}
+const { title, paso } = Astro.props;
+const NOMBRES_PASO = ["Negocio", "Horarios", "Menú", "Listo"];
+---
+
+<Layout title={title}>
+  <ol class="wizard-pasos">
+    {NOMBRES_PASO.map((nombre, i) => (
+      <li class:list={{ actual: i + 1 === paso, hecho: i + 1 < paso }}>
+        <span class="numero">{i + 1 < paso ? "✓" : i + 1}</span> {nombre}
+      </li>
+    ))}
+  </ol>
+  <slot />
+</Layout>
+
+<style>
+  .wizard-pasos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1.5rem;
+  }
+  .wizard-pasos li {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    opacity: 0.55;
+    font-size: 0.9em;
+  }
+  .wizard-pasos li.actual,
+  .wizard-pasos li.hecho {
+    opacity: 1;
+  }
+  .wizard-pasos li.actual {
+    font-weight: 600;
+  }
+  .numero {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.6em;
+    height: 1.6em;
+    border-radius: 50%;
+    border: 2px solid currentColor;
+    font-size: 0.8em;
+  }
+</style>

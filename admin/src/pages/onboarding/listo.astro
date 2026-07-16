@@ -1,0 +1,25 @@
+---
+import { env } from "cloudflare:workers";
+import WizardLayout from "../../layouts/WizardLayout.astro";
+import { obtenerNegocio } from "../../lib/db.ts";
+
+const usuario = Astro.locals.usuario;
+if (usuario.rol !== "dueno" || !usuario.negocio_id) {
+  return Astro.redirect(usuario.rol === "admin" ? "/admin/negocios" : "/onboarding");
+}
+const negocio = await obtenerNegocio(env.DB, usuario.negocio_id);
+if (!negocio) return Astro.redirect("/onboarding");
+---
+
+<WizardLayout title="Listo" paso={4}>
+  <p>
+    <strong>{negocio.nombre}</strong> ya está cargado en Atiendo Agenda. Nuestro equipo va a
+    activar tu plan y conectar tu número de WhatsApp — te avisamos apenas quede funcionando.
+  </p>
+  <p>
+    Mientras tanto, puedes seguir revisando o completando los datos de tu negocio.
+  </p>
+  <p>
+    <a href={`/negocios/${negocio.id}/editar`}>Ir a mi negocio</a>
+  </p>
+</WizardLayout>

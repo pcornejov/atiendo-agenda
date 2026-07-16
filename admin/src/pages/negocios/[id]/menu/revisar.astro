@@ -1,0 +1,103 @@
+---
+import { env } from "cloudflare:workers";
+import Layout from "../../../../layouts/Layout.astro";
+import { obtenerNegocio, crearMenuItemsEnLote } from "../../../../lib/db.ts";
+import { puedeAdministrarNegocio } from "../../../../lib/autorizacion.ts";
+import type { ItemMenuExtraido } from "../../../../lib/menu-parser.ts";
+
+const usuario = Astro.locals.usuario;
+const negocioId = Number(Astro.params.id);
+if (!puedeAdministrarNegocio(usuario, negocioId)) {
+  return new Response("No autorizado", { status: 403 });
+}
+
+const negocio = await obtenerNegocio(env.DB, negocioId);
+if (!negocio) {
+  return new Response("Negocio no encontrado", { status: 404 });
+}
+
+const claveSesion = `menu_borrador_${negocioId}`;
+const borrador = (await Astro.session?.get<ItemMenuExtraido[]>(claveSesion)) ?? [];
+if (borrador.length === 0) {
+  return Astro.redirect(`/negocios/${negocioId}/menu`);
+}
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  const accion = String(form.get("_accion") ?? "");
+
+  if (accion === "descartar") {
+    Astro.session?.delete(claveSesion);
+    return Astro.redirect(`/negocios/${negocioId}/menu`);
+  }
+
+  if (accion === "guardar") {
+    const itemsAGuardar = borrador
+      .map((_item, i) => {
+        if (form.get(`incluir_${i}`) !== "on") return null;
+        const nombre = String(form.get(`nombre_${i}`) ?? "").trim();
+        const descripcion = String(form.get(`descripcion_${i}`) ?? "").trim();
+        const precioClp = Number(form.get(`precio_${i}`));
+        if (nombre.length === 0 || !Number.isInteger(precioClp) || precioClp < 0) return null;
+        return { nombre, descripcion: descripcion.length > 0 ? descripcion : null, precioClp };
+      })
+      .filter((item): item is { nombre: string; descripcion: string | null; precioClp: number } => item !== null);
+
+    if (itemsAGuardar.length > 0) {
+      await crearMenuItemsEnLote(env.DB, negocioId, itemsAGuardar);
+    }
+    Astro.session?.delete(claveSesion);
+    return Astro.redirect(`/negocios/${negocioId}/menu`);
+  }
+}
+---
+
+<Layout title={`Revisar carta — ${negocio.nombre}`}>
+  <p>
+    Esto es lo que leímos de la carta. Revisa que esté todo correcto, corrige lo que haga falta, y
+    desmarca los ítems que no quieras agregar.
+  </p>
+
+  <form method="POST" class="form-grid">
+    {borrador.map((item, i) => (
+      <fieldset>
+        <label style="font-weight: normal;">
+          <input type="checkbox" name={`incluir_${i}`} checked />
+          Incluir este ítem
+        </label>
+        <label>
+          Nombre
+          <input type="text" name={`nombre_${i}`} value={item.nombre} required />
+        </label>
+        <label>
+          Descripción
+          <input type="text" name={`descripcion_${i}`} value={item.descripcion ?? ""} />
+        </label>
+        <label>
+          Precio (CLP)
+          <input type="number" name={`precio_${i}`} value={item.precioClp} min="0" required />
+        </label>
+      </fieldset>
+    ))}
+    <button type="submit" name="_accion" value="guardar">Guardar en el menú</button>
+  </form>
+
+  <form method="POST">
+    <button type="submit" name="_accion" value="descartar">Descartar y volver a subir</button>
+  </form>
+</Layout>
+
+<style>
+  fieldset {
+    border: 1px solid #8884;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+    padding: 0.75rem 1rem;
+  }
+  fieldset label {
+    display: grid;
+    gap: 0.25rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+</style>

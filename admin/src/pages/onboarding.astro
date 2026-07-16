@@ -7,7 +7,7 @@
 // esos dos campos se completan con un valor "pendiente" único y se editan
 // después desde el lado del administrador.
 import { env } from "cloudflare:workers";
-import Layout from "../layouts/Layout.astro";
+import WizardLayout from "../layouts/WizardLayout.astro";
 import { crearNegocio, vincularUsuarioANegocio } from "../lib/db.ts";
 import { validarNegocioForm, type NegocioFormValores } from "../lib/validacion.ts";
 
@@ -44,7 +44,7 @@ if (Astro.request.method === "POST") {
     const resultado = await crearNegocio(env.DB, validacion.datos);
     if (resultado.ok) {
       await vincularUsuarioANegocio(env.DB, usuario.id, resultado.id);
-      return Astro.redirect("/onboarding/plan");
+      return Astro.redirect("/onboarding/horarios");
     }
     errores = [resultado.error];
   } else {
@@ -53,7 +53,7 @@ if (Astro.request.method === "POST") {
 }
 ---
 
-<Layout title="Crea tu negocio">
+<WizardLayout title="Crea tu negocio" paso={1}>
   <p>Cuéntanos sobre tu negocio para configurar tu chatbot de WhatsApp.</p>
 
   {errores.length > 0 && (
@@ -88,4 +88,4 @@ if (Astro.request.method === "POST") {
     Después de crear tu negocio, nuestro equipo te va a contactar para conectar tu número de
     WhatsApp — es el único paso que todavía no es automático.
   </small></p>
-</Layout>
+</WizardLayout>

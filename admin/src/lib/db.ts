@@ -109,7 +109,7 @@ function mensajeErrorD1(error: unknown): string {
   if (texto.includes("UNIQUE constraint failed") && texto.includes("whatsapp_phone_number_id")) {
     return "Ya existe un negocio con ese Phone Number ID.";
   }
-  return "No se pudo guardar el negocio. Revisá los datos e intentá de nuevo.";
+  return "No se pudo guardar el negocio. Revisa los datos e intenta de nuevo.";
 }
 
 export interface Horario {
@@ -380,6 +380,24 @@ export async function crearMenuItem(
     )
     .bind(negocioId, params.nombre, params.descripcion, params.precioClp, params.orden)
     .run();
+}
+
+/** Inserta varios ítems de una vez — usado al confirmar la revisión de una carta leída por IA. */
+export async function crearMenuItemsEnLote(
+  db: D1Database,
+  negocioId: number,
+  items: Array<{ nombre: string; descripcion: string | null; precioClp: number }>
+): Promise<void> {
+  if (items.length === 0) return;
+  await db.batch(
+    items.map((item, i) =>
+      db
+        .prepare(
+          "INSERT INTO menu_items (negocio_id, nombre, descripcion, precio_clp, orden) VALUES (?, ?, ?, ?, ?)"
+        )
+        .bind(negocioId, item.nombre, item.descripcion, item.precioClp, i)
+    )
+  );
 }
 
 export async function eliminarMenuItem(db: D1Database, negocioId: number, menuItemId: number): Promise<void> {

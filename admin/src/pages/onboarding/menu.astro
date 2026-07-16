@@ -1,26 +1,15 @@
 ---
 import { env } from "cloudflare:workers";
-import Layout from "../../../layouts/Layout.astro";
-import {
-  obtenerNegocio,
-  listarMenu,
-  crearMenuItem,
-  eliminarMenuItem,
-  cambiarDisponibilidadMenuItem,
-} from "../../../lib/db.ts";
-import { puedeAdministrarNegocio } from "../../../lib/autorizacion.ts";
+import WizardLayout from "../../layouts/WizardLayout.astro";
+import { obtenerNegocio, listarMenu, crearMenuItem } from "../../lib/db.ts";
 
 const usuario = Astro.locals.usuario;
-const negocioId = Number(Astro.params.id);
-if (!puedeAdministrarNegocio(usuario, negocioId)) {
-  return new Response("No autorizado", { status: 403 });
+if (usuario.rol !== "dueno" || !usuario.negocio_id) {
+  return Astro.redirect(usuario.rol === "admin" ? "/admin/negocios" : "/onboarding");
 }
-
+const negocioId = usuario.negocio_id;
 const negocio = await obtenerNegocio(env.DB, negocioId);
-if (!negocio) {
-  return new Response("Negocio no encontrado", { status: 404 });
-}
-const volverUrl = usuario.rol === "admin" ? "/admin/negocios" : `/negocios/${negocioId}/editar`;
+if (!negocio) return Astro.redirect("/onboarding");
 
 const ERRORES_SUBIDA: Record<string, string> = {
   sin_archivos: "No se recibió ningún archivo.",
@@ -33,16 +22,13 @@ let error: string | null = ERRORES_SUBIDA[Astro.url.searchParams.get("error") ??
 
 if (Astro.request.method === "POST") {
   const form = await Astro.request.formData();
-  const accion = String(form.get("_accion") ?? "crear");
+  const accion = String(form.get("_accion") ?? "");
 
-  if (accion === "eliminar") {
-    const menuItemId = Number(form.get("menu_item_id"));
-    if (menuItemId) await eliminarMenuItem(env.DB, negocioId, menuItemId);
-  } else if (accion === "cambiar_disponibilidad") {
-    const menuItemId = Number(form.get("menu_item_id"));
-    const disponible = form.get("disponible") === "1";
-    if (menuItemId) await cambiarDisponibilidadMenuItem(env.DB, negocioId, menuItemId, disponible);
-  } else {
+  if (accion === "continuar") {
+    return Astro.redirect("/onboarding/listo");
+  }
+
+  if (accion === "crear") {
     const nombre = String(form.get("nombre") ?? "").trim();
     const descripcion = String(form.get("descripcion") ?? "").trim();
     const precioClp = Number(form.get("precio_clp"));
@@ -61,18 +47,19 @@ if (Astro.request.method === "POST") {
     }
   }
 
-  if (!error) return Astro.redirect(`/negocios/${negocioId}/menu`);
+  if (!error) return Astro.redirect("/onboarding/menu");
 }
 
 const menu = await listarMenu(env.DB, negocioId);
 ---
 
-<Layout title={`Menú — ${negocio.nombre}`}>
-  <p><a href={volverUrl}>&larr; Volver</a></p>
+<WizardLayout title="Menú" paso={3}>
+  <p>
+    Este paso es opcional — si <strong>{negocio.nombre}</strong> no vende comida, puedes continuar
+    directamente al siguiente paso.
+  </p>
 
   {error && <div class="error">{error}</div>}
-
-  {menu.length === 0 && <p>Todavía no hay ítems cargados en el menú de este negocio.</p>}
 
   {menu.length > 0 && (
     <table>
@@ -81,8 +68,6 @@ const menu = await listarMenu(env.DB, negocioId);
           <th>Nombre</th>
           <th>Descripción</th>
           <th>Precio</th>
-          <th>Estado</th>
-          <th></th>
         </tr>
       </thead>
       <tbody>
@@ -91,20 +76,6 @@ const menu = await listarMenu(env.DB, negocioId);
             <td>{item.nombre}</td>
             <td>{item.descripcion ?? "—"}</td>
             <td>${item.precio_clp.toLocaleString("es-CL")}</td>
-            <td>{item.disponible ? "Disponible" : <span class="badge-inactivo">No disponible</span>}</td>
-            <td>
-              <form class="inline" method="POST">
-                <input type="hidden" name="_accion" value="cambiar_disponibilidad" />
-                <input type="hidden" name="menu_item_id" value={item.id} />
-                <input type="hidden" name="disponible" value={item.disponible ? "0" : "1"} />
-                <button type="submit">{item.disponible ? "Marcar no disponible" : "Marcar disponible"}</button>
-              </form>
-              <form class="inline" method="POST">
-                <input type="hidden" name="_accion" value="eliminar" />
-                <input type="hidden" name="menu_item_id" value={item.id} />
-                <button type="submit">Eliminar</button>
-              </form>
-            </td>
           </tr>
         ))}
       </tbody>
@@ -112,13 +83,13 @@ const menu = await listarMenu(env.DB, negocioId);
   )}
 
   <h2>Subir la carta (foto o PDF)</h2>
-  <p>Sube una o más fotos de la carta, o un PDF, y creamos los ítems automáticamente.</p>
-  <form method="POST" enctype="multipart/form-data" action={`/negocios/${negocioId}/menu/subir`}>
+  <p>Sube una o más fotos de tu carta, o un PDF, y creamos los ítems automáticamente.</p>
+  <form method="POST" enctype="multipart/form-data" action="/onboarding/menu/subir">
     <input type="file" name="archivos" accept="image/*,application/pdf" multiple required />
     <button type="submit">Leer carta</button>
   </form>
 
-  <h2>Agregar ítem al menú</h2>
+  <h2>O agregar un ítem manualmente</h2>
   <form method="POST" class="form-grid">
     <input type="hidden" name="_accion" value="crear" />
     <label>
@@ -133,6 +104,13 @@ const menu = await listarMenu(env.DB, negocioId);
       Precio (CLP)
       <input type="number" name="precio_clp" min="0" required />
     </label>
-    <button type="submit">Agregar</button>
+    <button type="submit">Agregar ítem</button>
   </form>
-</Layout>
+
+  <p>
+    <form method="POST">
+      <input type="hidden" name="_accion" value="continuar" />
+      <button type="submit">{menu.length > 0 ? "Continuar" : "Saltar este paso"}</button>
+    </form>
+  </p>
+</WizardLayout>
