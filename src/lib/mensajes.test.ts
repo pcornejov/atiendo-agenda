@@ -7,6 +7,13 @@ import {
   formatearCancelacionExitosa,
   formatearMiCita,
   formatearSinCitaParaConsultar,
+  formatearFallback,
+  formatearMenu,
+  formatearSinMenu,
+  formatearResumenPedido,
+  formatearRepetirConfirmacionPedido,
+  formatearPedidoConfirmado,
+  formatearMiPedido,
 } from "./mensajes.ts";
 import type { SlotDisponible } from "./disponibilidad.ts";
 
@@ -41,4 +48,57 @@ test("formatearMiCita incluye el servicio y la fecha legible de la cita", () => 
 
 test("formatearSinCitaParaConsultar no lanza y devuelve texto no vacío", () => {
   assert.ok(formatearSinCitaParaConsultar().length > 0);
+});
+
+test("formatearFallback usa el nombre del negocio y agrega una línea por cada sugerencia de módulo activo", () => {
+  const texto = formatearFallback("Peluquería Demo", ["Sugerencia de agendamiento.", "Sugerencia de pedidos."]);
+  assert.match(texto, /Peluquería Demo/);
+  assert.match(texto, /Sugerencia de agendamiento\./);
+  assert.match(texto, /Sugerencia de pedidos\./);
+});
+
+const MENU = [
+  { nombre: "Empanada de pino", precio_clp: 2000 },
+  { nombre: "Bebida 350ml", precio_clp: 1200 },
+];
+
+test("formatearMenu lista los ítems con precio formateado en CLP", () => {
+  const texto = formatearMenu(MENU);
+  assert.match(texto, /Empanada de pino — \$2\.000/);
+  assert.match(texto, /Bebida 350ml — \$1\.200/);
+});
+
+test("formatearSinMenu no lanza y devuelve texto no vacío", () => {
+  assert.ok(formatearSinMenu().length > 0);
+});
+
+const ITEMS_PEDIDO = [
+  { nombre: "Empanada de pino", cantidad: 2, precioUnitarioClp: 2000 },
+  { nombre: "Bebida 350ml", cantidad: 1, precioUnitarioClp: 1200 },
+];
+
+test("formatearResumenPedido incluye cada ítem, su subtotal, y el total", () => {
+  const texto = formatearResumenPedido(ITEMS_PEDIDO, 5200);
+  assert.match(texto, /2x Empanada de pino — \$4\.000/);
+  assert.match(texto, /1x Bebida 350ml — \$1\.200/);
+  assert.match(texto, /Total: \$5\.200/);
+});
+
+test("formatearRepetirConfirmacionPedido incluye el resumen del pedido pendiente", () => {
+  const texto = formatearRepetirConfirmacionPedido(ITEMS_PEDIDO, 5200);
+  assert.match(texto, /2x Empanada de pino/);
+  assert.match(texto, /Total: \$5\.200/);
+});
+
+test("formatearPedidoConfirmado incluye el id del pedido y el total", () => {
+  const texto = formatearPedidoConfirmado(42, 5200);
+  assert.match(texto, /#42/);
+  assert.match(texto, /\$5\.200/);
+});
+
+test("formatearMiPedido traduce el estado interno a un texto legible", () => {
+  const texto = formatearMiPedido({ id: 7, estado: "preparando", total_clp: 3000 });
+  assert.match(texto, /#7/);
+  assert.match(texto, /en preparación/);
+  assert.match(texto, /\$3\.000/);
 });

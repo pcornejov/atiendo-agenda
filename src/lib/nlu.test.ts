@@ -4,6 +4,8 @@ import assert from "node:assert/strict";
 import {
   interpretarSolicitud,
   interpretarSeleccion,
+  interpretarPedido,
+  interpretarConfirmacion,
   type ClienteClaude,
 } from "./nlu.ts";
 
@@ -165,4 +167,84 @@ test("interpretarSeleccion: intent 'cancelar' ignora cualquier número", async (
     horariosOfrecidos: HORARIOS_OFRECIDOS,
   });
   assert.deepEqual(resultado, { intent: "cancelar", indiceSeleccionado: null });
+});
+
+const MENU_DISPONIBLE = ["Empanada de pino", "Completo italiano", "Bebida 350ml"];
+
+test("interpretarPedido: mapea items válidos del menú", async () => {
+  const client = clienteFalso({
+    intent: "pedido",
+    items: [
+      { nombre: "Empanada de pino", cantidad: 2 },
+      { nombre: "Bebida 350ml", cantidad: 1 },
+    ],
+  });
+  const resultado = await interpretarPedido(client, {
+    mensajeCliente: "quiero 2 empanadas de pino y una bebida",
+    menuDisponible: MENU_DISPONIBLE,
+  });
+  assert.deepEqual(resultado, {
+    intent: "pedido",
+    items: [
+      { nombre: "Empanada de pino", cantidad: 2 },
+      { nombre: "Bebida 350ml", cantidad: 1 },
+    ],
+  });
+});
+
+test("interpretarPedido: descarta items que no están en el menú (alucinación de Claude)", async () => {
+  const client = clienteFalso({
+    intent: "pedido",
+    items: [
+      { nombre: "Empanada de pino", cantidad: 1 },
+      { nombre: "Pizza familiar", cantidad: 1 }, // no está en MENU_DISPONIBLE
+    ],
+  });
+  const resultado = await interpretarPedido(client, {
+    mensajeCliente: "una empanada y una pizza familiar",
+    menuDisponible: MENU_DISPONIBLE,
+  });
+  assert.deepEqual(resultado.items, [{ nombre: "Empanada de pino", cantidad: 1 }]);
+});
+
+test("interpretarPedido: descarta cantidades inválidas (0, negativas, no enteras)", async () => {
+  const client = clienteFalso({
+    intent: "pedido",
+    items: [
+      { nombre: "Empanada de pino", cantidad: 0 },
+      { nombre: "Bebida 350ml", cantidad: -1 },
+      { nombre: "Completo italiano", cantidad: 1.5 },
+    ],
+  });
+  const resultado = await interpretarPedido(client, {
+    mensajeCliente: "mensaje raro",
+    menuDisponible: MENU_DISPONIBLE,
+  });
+  assert.deepEqual(resultado.items, []);
+});
+
+test("interpretarPedido: intent 'cancelar' no procesa items", async () => {
+  const client = clienteFalso({ intent: "cancelar", items: [{ nombre: "Empanada de pino", cantidad: 1 }] });
+  const resultado = await interpretarPedido(client, {
+    mensajeCliente: "mejor cancela mi pedido",
+    menuDisponible: MENU_DISPONIBLE,
+  });
+  assert.deepEqual(resultado, { intent: "cancelar", items: [] });
+});
+
+test("interpretarConfirmacion: mapea 'confirmar'/'cancelar'/'otro'", async () => {
+  const confirmar = await interpretarConfirmacion(clienteFalso({ intent: "confirmar" }), {
+    mensajeCliente: "sí, dale",
+  });
+  assert.deepEqual(confirmar, { intent: "confirmar" });
+
+  const cancelar = await interpretarConfirmacion(clienteFalso({ intent: "cancelar" }), {
+    mensajeCliente: "no, mejor no",
+  });
+  assert.deepEqual(cancelar, { intent: "cancelar" });
+
+  const otro = await interpretarConfirmacion(clienteFalso({ intent: "algo_invalido" }), {
+    mensajeCliente: "eh?",
+  });
+  assert.deepEqual(otro, { intent: "otro" });
 });

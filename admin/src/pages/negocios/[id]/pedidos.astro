@@ -1,0 +1,74 @@
+---
+import { env } from "cloudflare:workers";
+import Layout from "../../../layouts/Layout.astro";
+import { obtenerNegocio, listarPedidos, actualizarEstadoPedido, ESTADOS_PEDIDO, type EstadoPedido } from "../../../lib/db.ts";
+import { utcToZonedTexto } from "../../../lib/tz.ts";
+import { puedeAdministrarNegocio } from "../../../lib/autorizacion.ts";
+
+const usuario = Astro.locals.usuario;
+const negocioId = Number(Astro.params.id);
+if (!puedeAdministrarNegocio(usuario, negocioId)) {
+  return new Response("No autorizado", { status: 403 });
+}
+
+const negocio = await obtenerNegocio(env.DB, negocioId);
+if (!negocio) {
+  return new Response("Negocio no encontrado", { status: 404 });
+}
+const volverUrl = usuario.rol === "admin" ? "/admin/negocios" : `/negocios/${negocioId}/editar`;
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  const pedidoId = Number(form.get("pedido_id"));
+  const estado = String(form.get("estado")) as EstadoPedido;
+  if (pedidoId && (ESTADOS_PEDIDO as readonly string[]).includes(estado)) {
+    await actualizarEstadoPedido(env.DB, negocioId, pedidoId, estado);
+  }
+  return Astro.redirect(`/negocios/${negocioId}/pedidos`);
+}
+
+const pedidos = await listarPedidos(env.DB, negocioId);
+---
+
+<Layout title={`Pedidos — ${negocio.nombre}`}>
+  <p><a href={volverUrl}>&larr; Volver</a></p>
+
+  {pedidos.length === 0 && <p>No hay pedidos para este negocio todavía.</p>}
+
+  {pedidos.length > 0 && (
+    <table>
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Cliente</th>
+          <th>Teléfono</th>
+          <th>Total</th>
+          <th>Estado</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {pedidos.map((p) => (
+          <tr>
+            <td>{utcToZonedTexto(p.created_at, negocio.timezone)}</td>
+            <td>{p.cliente_nombre ?? "—"}</td>
+            <td>{p.cliente_telefono}</td>
+            <td>${p.total_clp.toLocaleString("es-CL")}</td>
+            <td>{p.estado}</td>
+            <td>
+              <form class="inline" method="POST">
+                <input type="hidden" name="pedido_id" value={p.id} />
+                <select name="estado">
+                  {ESTADOS_PEDIDO.map((e) => (
+                    <option value={e} selected={e === p.estado}>{e}</option>
+                  ))}
+                </select>
+                <button type="submit">Actualizar</button>
+              </form>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )}
+</Layout>

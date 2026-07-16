@@ -65,6 +65,82 @@ export function formatearSinCitaParaConsultar(): string {
   return "No encontré ninguna cita activa a tu nombre. ¿Quieres que te muestre horarios disponibles?";
 }
 
-export function formatearFallback(servicioNombre: string): string {
-  return `¡Hola! Soy el asistente de agendamiento para ${servicioNombre}. Escríbeme qué día y horario te gustaría, o "cancelar" si quieres cancelar una cita.`;
+/**
+ * `sugerencias` viene de los módulos activos del negocio (una línea por
+ * módulo, ver DefinicionModulo.sugerenciaFallback) — así el mensaje no
+ * asume que el negocio solo agenda horas cuando también puede tener, por
+ * ejemplo, el módulo de pedidos activo.
+ */
+export function formatearFallback(negocioNombre: string, sugerencias: string[]): string {
+  return [`¡Hola! Soy el asistente de ${negocioNombre}.`, ...sugerencias].join(" ");
+}
+
+export function formatearMenu(items: Array<{ nombre: string; precio_clp: number }>): string {
+  const lineas = items.map((i) => `- ${i.nombre} — $${i.precio_clp.toLocaleString("es-CL")}`);
+  return ["Este es nuestro menú:", ...lineas, "", "Dime qué quieres pedir y en qué cantidad."].join("\n");
+}
+
+export function formatearSinMenu(): string {
+  return "Por ahora no tenemos ítems disponibles en el menú.";
+}
+
+interface ItemResumen {
+  nombre: string;
+  cantidad: number;
+  precioUnitarioClp: number;
+}
+
+function formatearLineasPedido(items: ItemResumen[]): string[] {
+  return items.map((i) => `- ${i.cantidad}x ${i.nombre} — $${(i.cantidad * i.precioUnitarioClp).toLocaleString("es-CL")}`);
+}
+
+export function formatearResumenPedido(items: ItemResumen[], totalClp: number): string {
+  return [
+    "Tu pedido:",
+    ...formatearLineasPedido(items),
+    `Total: $${totalClp.toLocaleString("es-CL")}`,
+    "",
+    "¿Confirmas el pedido?",
+  ].join("\n");
+}
+
+export function formatearRepetirConfirmacionPedido(items: ItemResumen[], totalClp: number): string {
+  return [
+    "No entendí tu respuesta. Tu pedido pendiente es:",
+    ...formatearLineasPedido(items),
+    `Total: $${totalClp.toLocaleString("es-CL")}`,
+    "",
+    "Responde \"sí\" para confirmar, o \"cancelar\" si ya no lo quieres.",
+  ].join("\n");
+}
+
+export function formatearSinItemsValidos(): string {
+  return "No reconocí ningún ítem de nuestro menú en tu mensaje. ¿Puedes decirme qué quieres pedir?";
+}
+
+export function formatearPedidoConfirmado(pedidoId: number, totalClp: number): string {
+  return `¡Listo! Tu pedido #${pedidoId} quedó confirmado por un total de $${totalClp.toLocaleString("es-CL")}. Te avisamos cuando esté listo.`;
+}
+
+export function formatearPedidoCancelado(): string {
+  return "Listo, cancelé tu pedido.";
+}
+
+export function formatearSinPedidoParaCancelar(): string {
+  return "No encontré ningún pedido activo a tu nombre para cancelar.";
+}
+
+export function formatearMiPedido(pedido: { id: number; estado: string; total_clp: number }): string {
+  const estados: Record<string, string> = {
+    pendiente: "pendiente de confirmar",
+    confirmado: "confirmado",
+    preparando: "en preparación",
+    listo: "listo para retirar/entregar",
+  };
+  const estadoTexto = estados[pedido.estado] ?? pedido.estado;
+  return `Tu pedido #${pedido.id} está ${estadoTexto}. Total: $${pedido.total_clp.toLocaleString("es-CL")}.`;
+}
+
+export function formatearSinPedidoActivo(): string {
+  return "No encontré ningún pedido activo a tu nombre.";
 }

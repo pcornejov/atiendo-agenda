@@ -11,14 +11,16 @@ solo apunta al mismo `database_id`.
 **Estado actual**: login, autorización por rol, la integración con Flow
 (selección de plan, alta de cliente y registro de tarjeta, webhook de
 confirmación — ver advertencia sobre Flow más abajo, no probada contra una
-cuenta sandbox real todavía), y la **arquitectura de módulos del bot** ya
-están construidos: el bot (`../src/lib/flujo.ts`, `../src/lib/modulos/`)
-consulta `negocio_suscripciones`/`plan_modulos` en cada mensaje y solo
-responde a los intents de los módulos que el plan activo del negocio incluye.
-Hoy solo existe el módulo `agendamiento` (mismo comportamiento que antes de
-este cambio) — el módulo de venta de comida (Nivel 2) todavía no está
-implementado del lado del bot, aunque su schema ya existe. Ver "Qué falta"
-más abajo.
+cuenta sandbox real todavía), la **arquitectura de módulos del bot**, y el
+**módulo de venta de comida (Nivel 2)** ya están construidos: el bot
+(`../src/lib/flujo.ts`, `../src/lib/modulos/`) consulta
+`negocio_suscripciones`/`plan_modulos` en cada mensaje y solo responde a los
+intents de los módulos que el plan activo del negocio incluye — hoy
+`agendamiento` (agendar/cancelar/consultar una cita) y `pedidos` (ver menú,
+pedir, confirmar, consultar estado, cancelar). Los dueños con el módulo
+`pedidos` activo administran su menú y ven sus pedidos entrantes desde este
+panel (`/negocios/[id]/menu`, `/negocios/[id]/pedidos`). Ver "Qué falta" más
+abajo.
 
 **Importante**: un negocio sin ninguna suscripción `'activa'` no recibe
 ninguna respuesta del bot — el botón "Activar plan a mano" en
@@ -173,10 +175,15 @@ npm run typecheck   # astro check
 - `src/pages/admin/negocios/` — listado de **todos** los negocios con su plan/
   estado de suscripción, uso exclusivo de `rol = 'admin'`. Reemplaza a la
   vieja `/negocios` (que listaba todo sin distinguir roles).
-- `src/pages/negocios/[id]/` — editar, horarios, citas: scoped por
-  `negocioId`, con `puedeAdministrarNegocio` chequeado en cada página (no solo
-  ocultando el link en la navegación — la URL es adivinable). `editar.astro`
-  incluye, solo para `admin`, el botón para activar un plan a mano (sin Flow).
+- `src/pages/negocios/[id]/` — editar, horarios, citas, menú, pedidos: scoped
+  por `negocioId`, con `puedeAdministrarNegocio` chequeado en cada página (no
+  solo ocultando el link en la navegación — la URL es adivinable).
+  `editar.astro` incluye, solo para `admin`, el botón para activar un plan a
+  mano (sin Flow). Los links a `menu.astro`/`pedidos.astro` en la navegación
+  del dueño solo aparecen si su negocio tiene el módulo `pedidos` activo
+  (`listarCodigosModulosActivos` en `db.ts`) — igual chequeo que hace el bot,
+  aunque nada impide entrar a esas páginas directamente por URL si el negocio
+  no tiene el módulo (no rompe nada, solo es una pantalla que el bot no usa).
 
 ## Limitación real: el número de WhatsApp sigue siendo manual
 
@@ -193,7 +200,11 @@ no está construida todavía.
 - **Verificar Flow contra una cuenta sandbox real** (ver advertencia arriba)
   y construir el paso de `crearSuscripcionFlow` en el retorno del registro de
   tarjeta.
-- **Módulo de venta de comida (Nivel 2)**: el schema (`menu_items`, `pedidos`,
-  `pedido_items`) ya existe, pero no hay intents de NLU ni pantallas de admin
-  todavía.
+- **Notificación de pedidos nuevos**: hoy el dueño se entera de un pedido
+  entrando a `/negocios/[id]/pedidos` — no hay notificación push/WhatsApp
+  cuando entra uno.
+- **Nada todavía desplegado a producción** — todo este pivote (schema, auth,
+  Flow, módulos, pedidos) está commiteado pero no desplegado. Antes de
+  desplegar el bot hace falta activar un plan para el negocio piloto que ya
+  está en producción (ver `../README.md`), o deja de responder.
 - **WhatsApp Embedded Signup**, y **Nivel 3** (sin definir).

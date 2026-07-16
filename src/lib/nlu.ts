@@ -226,3 +226,138 @@ export async function interpretarSeleccion(
     indiceSeleccionado: numeroValido ? (numeroCrudo as number) - 1 : null,
   };
 }
+
+export type IntentPedido = "pedido" | "cancelar" | "otro";
+
+export interface ItemPedidoInterpretado {
+  nombre: string;
+  cantidad: number;
+}
+
+export interface PedidoInterpretado {
+  intent: IntentPedido;
+  items: ItemPedidoInterpretado[]; // vacío salvo que intent sea 'pedido'
+}
+
+const TOOL_INTERPRETAR_PEDIDO: Anthropic.Tool = {
+  name: "interpretar_pedido",
+  description:
+    "El cliente le escribe a un negocio de comida por WhatsApp. Extrae qué ítems del menú pidió y en qué cantidad.",
+  input_schema: {
+    type: "object",
+    properties: {
+      intent: {
+        type: "string",
+        enum: ["pedido", "cancelar", "otro"],
+        description:
+          "'pedido' si el cliente especificó qué quiere pedir (aunque sea parcial). 'cancelar' si quiere cancelar un pedido. 'otro' si no se entiende o pregunta algo distinto.",
+      },
+      items: {
+        type: "array",
+        description:
+          "Ítems pedidos. El nombre debe coincidir EXACTAMENTE con uno de los del menú disponible (no inventar ítems que no estén en la lista) — si el cliente pide algo que no está en el menú, no lo incluyas acá.",
+        items: {
+          type: "object",
+          properties: {
+            nombre: { type: "string" },
+            cantidad: { type: "integer" },
+          },
+          required: ["nombre", "cantidad"],
+        },
+      },
+    },
+    required: ["intent", "items"],
+  },
+};
+
+function construirSystemPromptPedido(menuDisponible: string[]): string {
+  const lista = menuDisponible.map((nombre) => `- ${nombre}`).join("\n");
+  return [
+    "Eres el asistente de pedidos de un negocio de comida. Este es el menú disponible:",
+    lista,
+    "El cliente te escribió por WhatsApp para hacer un pedido. Interpreta su mensaje usando la herramienta interpretar_pedido.",
+    "Usa únicamente nombres de ítems que estén EXACTAMENTE en la lista del menú de arriba.",
+  ].join("\n");
+}
+
+/** Interpreta un mensaje del cliente pidiendo comida, contra el menú real disponible. */
+export async function interpretarPedido(
+  client: ClienteClaude,
+  params: { mensajeCliente: string; menuDisponible: string[] }
+): Promise<PedidoInterpretado> {
+  const respuesta = await client.messages.create({
+    model: MODELO_HAIKU,
+    max_tokens: 512,
+    system: construirSystemPromptPedido(params.menuDisponible),
+    messages: [{ role: "user", content: params.mensajeCliente }],
+    tools: [TOOL_INTERPRETAR_PEDIDO],
+    tool_choice: { type: "tool", name: "interpretar_pedido" },
+  });
+
+  const bloque = respuesta.content.find(
+    (b): b is { type: "tool_use"; name: string; input: unknown } => b.type === "tool_use"
+  );
+  if (!bloque || typeof bloque.input !== "object" || bloque.input === null) {
+    return { intent: "otro", items: [] };
+  }
+
+  const input = bloque.input as Record<string, unknown>;
+  const intentsValidos: readonly IntentPedido[] = ["pedido", "cancelar", "otro"];
+  const intent = intentsValidos.includes(input.intent as IntentPedido) ? (input.intent as IntentPedido) : "otro";
+
+  const menuValido = new Set(params.menuDisponible);
+  const itemsCrudos = Array.isArray(input.items) ? input.items : [];
+  const items: ItemPedidoInterpretado[] = itemsCrudos
+    .filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null)
+    .map((item) => ({ nombre: String(item.nombre), cantidad: Number(item.cantidad) }))
+    .filter((item) => menuValido.has(item.nombre) && Number.isInteger(item.cantidad) && item.cantidad > 0);
+
+  return { intent, items: intent === "pedido" ? items : [] };
+}
+
+export type IntentConfirmacion = "confirmar" | "cancelar" | "otro";
+
+const TOOL_INTERPRETAR_CONFIRMACION: Anthropic.Tool = {
+  name: "interpretar_confirmacion",
+  description:
+    "El negocio le mostró al cliente un resumen y le pidió que confirme. Interpreta si el cliente confirma, cancela, o dice algo distinto.",
+  input_schema: {
+    type: "object",
+    properties: {
+      intent: {
+        type: "string",
+        enum: ["confirmar", "cancelar", "otro"],
+        description:
+          "'confirmar' si el cliente aprueba tal como se le mostró (ej. 'sí', 'dale', 'confirmo'). 'cancelar' si no lo quiere. 'otro' si no queda claro o pide un cambio.",
+      },
+    },
+    required: ["intent"],
+  },
+};
+
+/** Interpreta una respuesta de sí/no/cancelar a una confirmación pendiente. */
+export async function interpretarConfirmacion(
+  client: ClienteClaude,
+  params: { mensajeCliente: string }
+): Promise<{ intent: IntentConfirmacion }> {
+  const respuesta = await client.messages.create({
+    model: MODELO_HAIKU,
+    max_tokens: 128,
+    system:
+      "Eres el asistente de un negocio. Le pediste al cliente que confirme algo pendiente. El cliente respondió por WhatsApp — interpreta su respuesta usando la herramienta interpretar_confirmacion.",
+    messages: [{ role: "user", content: params.mensajeCliente }],
+    tools: [TOOL_INTERPRETAR_CONFIRMACION],
+    tool_choice: { type: "tool", name: "interpretar_confirmacion" },
+  });
+
+  const bloque = respuesta.content.find(
+    (b): b is { type: "tool_use"; name: string; input: unknown } => b.type === "tool_use"
+  );
+  if (!bloque || typeof bloque.input !== "object" || bloque.input === null) {
+    return { intent: "otro" };
+  }
+
+  const input = bloque.input as Record<string, unknown>;
+  const intentsValidos: readonly IntentConfirmacion[] = ["confirmar", "cancelar", "otro"];
+  return { intent: intentsValidos.includes(input.intent as IntentConfirmacion) ? (input.intent as IntentConfirmacion) : "otro" };
+}

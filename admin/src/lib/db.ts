@@ -335,3 +335,104 @@ export async function obtenerNegocioIdPorFlowCustomerId(db: D1Database, flowCust
     .first<{ negocio_id: number }>();
   return fila?.negocio_id ?? null;
 }
+
+/** Mismo cálculo que usa el bot (src/lib/flujo.ts) para saber qué módulos ofrecerle a un negocio. */
+export async function listarCodigosModulosActivos(db: D1Database, negocioId: number): Promise<string[]> {
+  const resultado = await db
+    .prepare(
+      `SELECT DISTINCT m.codigo
+       FROM negocio_suscripciones s
+       JOIN plan_modulos pm ON pm.plan_id = s.plan_id
+       JOIN modulos m ON m.id = pm.modulo_id
+       WHERE s.negocio_id = ? AND s.estado = 'activa'`
+    )
+    .bind(negocioId)
+    .all<{ codigo: string }>();
+  return resultado.results.map((r) => r.codigo);
+}
+
+export interface MenuItem {
+  id: number;
+  negocio_id: number;
+  nombre: string;
+  descripcion: string | null;
+  precio_clp: number;
+  disponible: number;
+  orden: number;
+}
+
+export async function listarMenu(db: D1Database, negocioId: number): Promise<MenuItem[]> {
+  const resultado = await db
+    .prepare("SELECT * FROM menu_items WHERE negocio_id = ? ORDER BY orden, nombre")
+    .bind(negocioId)
+    .all<MenuItem>();
+  return resultado.results;
+}
+
+export async function crearMenuItem(
+  db: D1Database,
+  negocioId: number,
+  params: { nombre: string; descripcion: string | null; precioClp: number; orden: number }
+): Promise<void> {
+  await db
+    .prepare(
+      "INSERT INTO menu_items (negocio_id, nombre, descripcion, precio_clp, orden) VALUES (?, ?, ?, ?, ?)"
+    )
+    .bind(negocioId, params.nombre, params.descripcion, params.precioClp, params.orden)
+    .run();
+}
+
+export async function eliminarMenuItem(db: D1Database, negocioId: number, menuItemId: number): Promise<void> {
+  await db
+    .prepare("DELETE FROM menu_items WHERE id = ? AND negocio_id = ?")
+    .bind(menuItemId, negocioId)
+    .run();
+}
+
+export async function cambiarDisponibilidadMenuItem(
+  db: D1Database,
+  negocioId: number,
+  menuItemId: number,
+  disponible: boolean
+): Promise<void> {
+  await db
+    .prepare("UPDATE menu_items SET disponible = ? WHERE id = ? AND negocio_id = ?")
+    .bind(disponible ? 1 : 0, menuItemId, negocioId)
+    .run();
+}
+
+export interface Pedido {
+  id: number;
+  cliente_telefono: string;
+  cliente_nombre: string | null;
+  estado: string;
+  total_clp: number;
+  created_at: string;
+}
+
+/** Pedidos de un negocio, excluyendo los cancelados (que ya no necesitan seguimiento). */
+export async function listarPedidos(db: D1Database, negocioId: number): Promise<Pedido[]> {
+  const resultado = await db
+    .prepare(
+      `SELECT id, cliente_telefono, cliente_nombre, estado, total_clp, created_at
+       FROM pedidos WHERE negocio_id = ? AND estado != 'cancelado' ORDER BY created_at DESC`
+    )
+    .bind(negocioId)
+    .all<Pedido>();
+  return resultado.results;
+}
+
+export const ESTADOS_PEDIDO = ["pendiente", "confirmado", "preparando", "listo", "entregado", "cancelado"] as const;
+export type EstadoPedido = (typeof ESTADOS_PEDIDO)[number];
+
+export async function actualizarEstadoPedido(
+  db: D1Database,
+  negocioId: number,
+  pedidoId: number,
+  estado: EstadoPedido
+): Promise<void> {
+  await db
+    .prepare("UPDATE pedidos SET estado = ? WHERE id = ? AND negocio_id = ?")
+    .bind(estado, pedidoId, negocioId)
+    .run();
+}

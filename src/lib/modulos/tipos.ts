@@ -8,6 +8,7 @@ import type { MensajeEntrante } from "../webhook.ts";
 
 export interface NegocioRow {
   id: number;
+  nombre: string;
   servicio_nombre: string;
   duracion_minutos: number;
   timezone: string;
@@ -26,6 +27,8 @@ export interface ContextoModulo {
 export interface DefinicionModulo {
   codigo: string;
   intents: DescripcionIntent[];
+  /** Una línea que se agrega al mensaje de fallback cuando este módulo está activo. */
+  sugerenciaFallback: string;
   /**
    * Maneja un intent nuevo (sin conversación pendiente). Devuelve true si
    * este módulo lo reconoció y lo manejó (así flujo.ts sabe no seguir

@@ -51,6 +51,10 @@ const negocios = await listarNegociosConSuscripcion(env.DB);
               {" · "}
               <a href={`/negocios/${n.id}/citas`}>Citas</a>
               {" · "}
+              <a href={`/negocios/${n.id}/menu`}>Menú</a>
+              {" · "}
+              <a href={`/negocios/${n.id}/pedidos`}>Pedidos</a>
+              {" · "}
               <form class="inline" method="POST">
                 <input type="hidden" name="negocio_id" value={n.id} />
                 <input type="hidden" name="activo" value={n.activo ? "0" : "1"} />

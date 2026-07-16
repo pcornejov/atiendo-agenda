@@ -11,13 +11,14 @@ import { enviarMensajeWhatsApp } from "./whatsapp.ts";
 import { utcToZoned, diaSemanaDeFecha, nombreDiaSemana } from "./tz.ts";
 import { formatearFallback } from "./mensajes.ts";
 import { moduloAgendamiento } from "./modulos/agendamiento.ts";
+import { moduloPedidos } from "./modulos/pedidos.ts";
 import type { DefinicionModulo, NegocioRow, ContextoModulo } from "./modulos/tipos.ts";
 import type { MensajeEntrante } from "./webhook.ts";
 
 // Catálogo de módulos que el bot sabe manejar. Cuáles están ACTIVOS para un
 // negocio en particular se decide en obtenerModulosActivos, por su
 // suscripción — no acá.
-const MODULOS_DISPONIBLES: DefinicionModulo[] = [moduloAgendamiento];
+const MODULOS_DISPONIBLES: DefinicionModulo[] = [moduloAgendamiento, moduloPedidos];
 
 async function obtenerModulosActivos(db: D1Database, negocioId: number): Promise<DefinicionModulo[]> {
   const resultado = await db
@@ -46,7 +47,7 @@ export async function procesarMensajeEntrante(params: {
 
   const negocio = await db
     .prepare(
-      "SELECT id, servicio_nombre, duracion_minutos, timezone, whatsapp_phone_number_id FROM negocios WHERE whatsapp_phone_number_id = ? AND activo = 1"
+      "SELECT id, nombre, servicio_nombre, duracion_minutos, timezone, whatsapp_phone_number_id FROM negocios WHERE whatsapp_phone_number_id = ? AND activo = 1"
     )
     .bind(mensaje.phoneNumberId)
     .first<NegocioRow>();
@@ -103,5 +104,5 @@ export async function procesarMensajeEntrante(params: {
     if (await modulo.manejarIntent(solicitud, ctx)) return;
   }
 
-  await enviar(formatearFallback(negocio.servicio_nombre));
+  await enviar(formatearFallback(negocio.nombre, modulos.map((m) => m.sugerenciaFallback)));
 }

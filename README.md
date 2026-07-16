@@ -52,16 +52,21 @@ de punta a punta (probado con un negocio de demo). Pendiente:
    intents de todos los módulos activos y la interpreta con `interpretarSolicitud`
    (`src/lib/nlu.ts`, Claude Haiku), y despacha el intent devuelto al módulo que lo
    declaró.
-5. Cada módulo (`src/lib/modulos/`) resuelve su propia lógica — hoy solo existe
-   `agendamiento.ts` (agendar/cancelar/consultar una cita, con `interpretarSeleccion`
-   para reanudar la elección de horario y `src/lib/reserva.ts` para el re-chequeo de
-   solapamiento justo antes de insertar) — y responde por WhatsApp
-   (`src/lib/whatsapp.ts`, `src/lib/mensajes.ts`).
+5. Cada módulo (`src/lib/modulos/`) resuelve su propia lógica y responde por WhatsApp
+   (`src/lib/whatsapp.ts`, `src/lib/mensajes.ts`). Hoy existen dos:
+   - `agendamiento.ts` — agendar/cancelar/consultar una cita, con `interpretarSeleccion`
+     para reanudar la elección de horario y `src/lib/reserva.ts` para el re-chequeo de
+     solapamiento justo antes de insertar.
+   - `pedidos.ts` — ver menú, pedir, confirmar, consultar estado, cancelar. Usa
+     `interpretarPedido` (extrae ítems + cantidades del menú real del negocio, sin
+     inventar ítems que no estén en la lista) y `interpretarConfirmacion` para
+     reanudar la confirmación pendiente, con `src/lib/pedido.ts` para el acceso a
+     datos. Los ítems del menú y los pedidos entrantes se administran desde el
+     [panel de administración](./admin/) (`/negocios/[id]/menu`, `/negocios/[id]/pedidos`).
 
-Agregar un módulo nuevo (ej. venta de comida) significa: una fila en `modulos`,
-sumarlo en `plan_modulos` para el plan que lo incluya, e implementar
-`DefinicionModulo` (`src/lib/modulos/tipos.ts`) — sin tocar el resto de los
-módulos existentes.
+Agregar un módulo nuevo significa: una fila en `modulos`, sumarlo en `plan_modulos`
+para el plan que lo incluya, e implementar `DefinicionModulo`
+(`src/lib/modulos/tipos.ts`) — sin tocar el resto de los módulos existentes.
 
 **Importante para dar de alta un negocio a mano** (`seed.sql`, o directo por SQL):
 sin una fila en `negocio_suscripciones` con `estado = 'activa'`, el bot no le

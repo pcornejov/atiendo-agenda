@@ -1,0 +1,124 @@
+---
+import { env } from "cloudflare:workers";
+import Layout from "../../../layouts/Layout.astro";
+import {
+  obtenerNegocio,
+  listarMenu,
+  crearMenuItem,
+  eliminarMenuItem,
+  cambiarDisponibilidadMenuItem,
+} from "../../../lib/db.ts";
+import { puedeAdministrarNegocio } from "../../../lib/autorizacion.ts";
+
+const usuario = Astro.locals.usuario;
+const negocioId = Number(Astro.params.id);
+if (!puedeAdministrarNegocio(usuario, negocioId)) {
+  return new Response("No autorizado", { status: 403 });
+}
+
+const negocio = await obtenerNegocio(env.DB, negocioId);
+if (!negocio) {
+  return new Response("Negocio no encontrado", { status: 404 });
+}
+const volverUrl = usuario.rol === "admin" ? "/admin/negocios" : `/negocios/${negocioId}/editar`;
+
+let error: string | null = null;
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  const accion = String(form.get("_accion") ?? "crear");
+
+  if (accion === "eliminar") {
+    const menuItemId = Number(form.get("menu_item_id"));
+    if (menuItemId) await eliminarMenuItem(env.DB, negocioId, menuItemId);
+  } else if (accion === "cambiar_disponibilidad") {
+    const menuItemId = Number(form.get("menu_item_id"));
+    const disponible = form.get("disponible") === "1";
+    if (menuItemId) await cambiarDisponibilidadMenuItem(env.DB, negocioId, menuItemId, disponible);
+  } else {
+    const nombre = String(form.get("nombre") ?? "").trim();
+    const descripcion = String(form.get("descripcion") ?? "").trim();
+    const precioClp = Number(form.get("precio_clp"));
+
+    if (nombre.length === 0) {
+      error = "El nombre no puede estar vacío.";
+    } else if (!Number.isInteger(precioClp) || precioClp < 0) {
+      error = "El precio debe ser un número entero mayor o igual a 0.";
+    } else {
+      await crearMenuItem(env.DB, negocioId, {
+        nombre,
+        descripcion: descripcion.length > 0 ? descripcion : null,
+        precioClp,
+        orden: 0,
+      });
+    }
+  }
+
+  if (!error) return Astro.redirect(`/negocios/${negocioId}/menu`);
+}
+
+const menu = await listarMenu(env.DB, negocioId);
+---
+
+<Layout title={`Menú — ${negocio.nombre}`}>
+  <p><a href={volverUrl}>&larr; Volver</a></p>
+
+  {error && <div class="error">{error}</div>}
+
+  {menu.length === 0 && <p>Todavía no hay ítems cargados en el menú de este negocio.</p>}
+
+  {menu.length > 0 && (
+    <table>
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th>Descripción</th>
+          <th>Precio</th>
+          <th>Estado</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {menu.map((item) => (
+          <tr>
+            <td>{item.nombre}</td>
+            <td>{item.descripcion ?? "—"}</td>
+            <td>${item.precio_clp.toLocaleString("es-CL")}</td>
+            <td>{item.disponible ? "Disponible" : <span class="badge-inactivo">No disponible</span>}</td>
+            <td>
+              <form class="inline" method="POST">
+                <input type="hidden" name="_accion" value="cambiar_disponibilidad" />
+                <input type="hidden" name="menu_item_id" value={item.id} />
+                <input type="hidden" name="disponible" value={item.disponible ? "0" : "1"} />
+                <button type="submit">{item.disponible ? "Marcar no disponible" : "Marcar disponible"}</button>
+              </form>
+              <form class="inline" method="POST">
+                <input type="hidden" name="_accion" value="eliminar" />
+                <input type="hidden" name="menu_item_id" value={item.id} />
+                <button type="submit">Eliminar</button>
+              </form>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )}
+
+  <h2>Agregar ítem al menú</h2>
+  <form method="POST" class="form-grid">
+    <input type="hidden" name="_accion" value="crear" />
+    <label>
+      Nombre
+      <input type="text" name="nombre" required />
+    </label>
+    <label>
+      Descripción (opcional)
+      <input type="text" name="descripcion" />
+    </label>
+    <label>
+      Precio (CLP)
+      <input type="number" name="precio_clp" min="0" required />
+    </label>
+    <button type="submit">Agregar</button>
+  </form>
+</Layout>

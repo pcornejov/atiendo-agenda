@@ -146,6 +146,7 @@ export const moduloAgendamiento: DefinicionModulo = {
     },
     { nombre: "cancelar", descripcion: "el cliente pide cancelar una cita existente." },
   ],
+  sugerenciaFallback: "Escríbeme qué día y horario te gustaría, o \"cancelar\" si quieres cancelar una cita.",
   manejarIntent,
   manejarEstadoPendiente,
 };
