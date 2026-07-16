@@ -12,9 +12,25 @@ if (Astro.locals.usuario) {
 }
 
 const planes = await listarPlanesActivos(env.DB);
-const NOMBRES_PLAN: Record<string, { nombre: string; descripcion: string }> = {
-  basico: { nombre: "Agenda de horas", descripcion: "Tus clientes reservan y consultan horas por WhatsApp." },
-  nivel2: { nombre: "Venta de comida", descripcion: "Tus clientes ven la carta y hacen pedidos por WhatsApp." },
+const NOMBRES_PLAN: Record<string, { nombre: string; descripcion: string; incluye: string[] }> = {
+  basico: {
+    nombre: "Agenda de horas",
+    descripcion: "Tus clientes reservan y consultan horas por WhatsApp.",
+    incluye: [
+      "Agenda ilimitada por WhatsApp, 24/7",
+      "Recordatorios automáticos de citas",
+      "Panel para administrar horarios y citas",
+    ],
+  },
+  nivel2: {
+    nombre: "Venta de comida",
+    descripcion: "Tus clientes ven la carta y hacen pedidos por WhatsApp.",
+    incluye: [
+      "Pedidos ilimitados por WhatsApp, 24/7",
+      "Carga de carta por foto, PDF o Excel",
+      "Panel para administrar menú y pedidos",
+    ],
+  },
 };
 ---
 
@@ -99,11 +115,18 @@ const NOMBRES_PLAN: Record<string, { nombre: string; descripcion: string }> = {
       }
 
       .hero {
-        padding: 4rem 0 3rem;
+        padding: 3.5rem 0;
+      }
+      .hero .contenedor {
+        display: grid;
+        gap: 2.5rem;
+        align-items: center;
+      }
+      .hero-texto {
         text-align: center;
       }
       .hero h1 {
-        font-size: clamp(2rem, 5vw, 3rem);
+        font-size: clamp(2rem, 5vw, 2.75rem);
         margin: 0 0 1rem;
       }
       .hero p {
@@ -117,6 +140,67 @@ const NOMBRES_PLAN: Record<string, { nombre: string; descripcion: string }> = {
         gap: 0.75rem;
         justify-content: center;
         flex-wrap: wrap;
+      }
+      .hero-demo {
+        max-width: 380px;
+        margin: 0 auto;
+        padding: 1.25rem;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--surface);
+        box-shadow: var(--shadow);
+      }
+
+      @media (min-width: 860px) {
+        .hero .contenedor {
+          grid-template-columns: 1fr 1fr;
+        }
+        .hero-texto {
+          text-align: left;
+        }
+        .hero p {
+          margin: 0 0 2rem;
+        }
+        .hero .cta {
+          justify-content: flex-start;
+        }
+        .hero-demo {
+          margin: 0;
+        }
+      }
+
+      /* Rubros que atendemos */
+      .rubros {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: 1fr;
+      }
+      .rubro {
+        padding: 1.25rem;
+        border: 1.5px solid var(--line);
+        border-radius: 10px;
+        background: var(--surface);
+        text-align: center;
+      }
+      .rubro .icono {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2.75rem;
+        height: 2.75rem;
+        border-radius: 50%;
+        background: var(--accent);
+        font-size: 1.35rem;
+        margin-bottom: 0.75rem;
+      }
+      .rubro h3 {
+        font-size: 1rem;
+        margin: 0 0 0.35rem;
+      }
+      .rubro p {
+        margin: 0;
+        color: var(--ink-muted);
+        font-size: 0.88rem;
       }
 
       section {
@@ -253,6 +337,68 @@ const NOMBRES_PLAN: Record<string, { nombre: string; descripcion: string }> = {
         font-size: 0.9rem;
         margin: 0 0 1.25rem;
       }
+      .tarjeta-precio ul.incluye {
+        list-style: none;
+        padding: 0;
+        margin: 0 0 1.5rem;
+        text-align: left;
+        display: grid;
+        gap: 0.5rem;
+        font-size: 0.88rem;
+        color: var(--ink);
+      }
+      .tarjeta-precio ul.incluye li {
+        display: flex;
+        gap: 0.5rem;
+        align-items: baseline;
+      }
+      .tarjeta-precio ul.incluye li::before {
+        content: "✓";
+        color: var(--success);
+        font-weight: 700;
+      }
+
+      /* Preguntas frecuentes */
+      .preguntas {
+        max-width: 640px;
+        margin: 0 auto;
+        display: grid;
+        gap: 0.75rem;
+      }
+      .pregunta {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--surface);
+        padding: 0.25rem 1.1rem;
+      }
+      .pregunta summary {
+        cursor: pointer;
+        font-weight: 600;
+        padding: 0.85rem 0;
+        list-style: none;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+      }
+      .pregunta summary::-webkit-details-marker {
+        display: none;
+      }
+      .pregunta summary::after {
+        content: "+";
+        font-family: var(--font-display);
+        font-size: 1.3rem;
+        color: var(--ink-muted);
+        flex-shrink: 0;
+      }
+      .pregunta[open] summary::after {
+        content: "–";
+      }
+      .pregunta p {
+        margin: 0 0 1rem;
+        color: var(--ink-muted);
+        font-size: 0.92rem;
+      }
 
       .cta-final {
         text-align: center;
@@ -278,6 +424,9 @@ const NOMBRES_PLAN: Record<string, { nombre: string; descripcion: string }> = {
         .precios {
           grid-template-columns: repeat(2, 1fr);
         }
+        .rubros {
+          grid-template-columns: repeat(4, 1fr);
+        }
       }
     </style>
   </head>
@@ -294,14 +443,50 @@ const NOMBRES_PLAN: Record<string, { nombre: string; descripcion: string }> = {
 
     <section class="hero">
       <div class="contenedor">
-        <h1>Tu WhatsApp, atendido solo</h1>
-        <p>
-          Conecta un chatbot a tu WhatsApp para que tus clientes agenden horas o hagan pedidos
-          las 24 horas, sin que tengas que estar pendiente del teléfono.
+        <div class="hero-texto">
+          <h1>Tu WhatsApp, atendido solo</h1>
+          <p>
+            Conecta un chatbot a tu WhatsApp para que tus clientes agenden horas o hagan pedidos
+            las 24 horas, sin que tengas que estar pendiente del teléfono.
+          </p>
+          <div class="cta">
+            <a href="/auth/registro" class="boton boton-primario">Crear cuenta gratis</a>
+            <a href="/auth/login" class="boton boton-secundario">Iniciar sesión</a>
+          </div>
+        </div>
+        <div class="hero-demo">
+          <ChatDemo mensajes={DEMO_AGENDA} />
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="contenedor">
+        <h2>Para cada tipo de negocio</h2>
+        <p class="subtitulo">
+          Hoy cubrimos agenda de horas y venta de comida — funciona para estos rubros y más.
         </p>
-        <div class="cta">
-          <a href="/auth/registro" class="boton boton-primario">Crear cuenta gratis</a>
-          <a href="/auth/login" class="boton boton-secundario">Iniciar sesión</a>
+        <div class="rubros">
+          <div class="rubro">
+            <span class="icono">💇</span>
+            <h3>Peluquería y barbería</h3>
+            <p>Reservas de hora sin llamadas.</p>
+          </div>
+          <div class="rubro">
+            <span class="icono">🍔</span>
+            <h3>Comida rápida</h3>
+            <p>Piden por WhatsApp, retiran o reciben.</p>
+          </div>
+          <div class="rubro">
+            <span class="icono">🦷</span>
+            <h3>Clínicas y consultas</h3>
+            <p>Agenda de horas médicas o dentales.</p>
+          </div>
+          <div class="rubro">
+            <span class="icono">☕</span>
+            <h3>Cafeterías y panaderías</h3>
+            <p>Pedidos para retiro en el local.</p>
+          </div>
         </div>
       </div>
     </section>
@@ -310,7 +495,7 @@ const NOMBRES_PLAN: Record<string, { nombre: string; descripcion: string }> = {
       <div class="contenedor">
         <h2>Así conversa tu bot</h2>
         <p class="subtitulo">
-          Ejemplos reales de cómo responde — elige un rubro para ver la conversación completa.
+          Profundiza en el ejemplo de tu rubro — elige uno para ver la conversación completa.
         </p>
 
         <div class="demo-tabs">
@@ -380,10 +565,56 @@ const NOMBRES_PLAN: Record<string, { nombre: string; descripcion: string }> = {
                 <span class="precio">
                   ${plan.precio_mensual_clp.toLocaleString("es-CL")}<small> / mes</small>
                 </span>
+                <ul class="incluye">
+                  {info.incluye.map((item) => (
+                    <li>{item}</li>
+                  ))}
+                </ul>
                 <a href="/auth/registro" class="boton boton-primario">Crear cuenta gratis</a>
               </div>
             );
           })}
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="contenedor">
+        <h2>Preguntas frecuentes</h2>
+        <div class="preguntas">
+          <details class="pregunta">
+            <summary>¿Tengo que cambiar mi número de WhatsApp?</summary>
+            <p>
+              No necesariamente. Puedes usar un número nuevo dedicado al bot, o liberar uno que
+              ya tengas — eso sí, no puede seguir activo al mismo tiempo en la app normal de
+              WhatsApp o WhatsApp Business.
+            </p>
+          </details>
+          <details class="pregunta">
+            <summary>¿Cuánto tarda en quedar funcionando mi WhatsApp?</summary>
+            <p>
+              Hoy la conexión del número la coordina nuestro equipo contigo — normalmente toma
+              algunos días mientras se verifica la cuenta con Meta.
+            </p>
+          </details>
+          <details class="pregunta">
+            <summary>¿Necesito tarjeta de crédito para probar?</summary>
+            <p>
+              No. Te registras, eliges tu plan y completas la configuración sin pedirte datos de
+              pago.
+            </p>
+          </details>
+          <details class="pregunta">
+            <summary>¿Puedo cancelar cuando quiera?</summary>
+            <p>Sí, escríbenos y damos de baja tu cuenta — no hay permanencia mínima.</p>
+          </details>
+          <details class="pregunta">
+            <summary>¿Y si mi negocio no es de agenda ni de comida?</summary>
+            <p>
+              Por ahora ofrecemos esos dos rubros. Si el tuyo es distinto, escríbenos y vemos
+              cómo adaptarlo.
+            </p>
+          </details>
         </div>
       </div>
     </section>
