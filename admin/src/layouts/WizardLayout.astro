@@ -24,33 +24,43 @@ const NOMBRES_PASO = ["Negocio", "Horarios", "Menú", "Listo"];
   .wizard-pasos {
     display: flex;
     flex-wrap: wrap;
-    gap: 1.5rem;
+    gap: 0.5rem 1.5rem;
     list-style: none;
     padding: 0;
-    margin: 0 0 1.5rem;
+    margin: 0 0 2rem;
   }
   .wizard-pasos li {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
-    opacity: 0.55;
-    font-size: 0.9em;
+    gap: 0.5rem;
+    color: var(--ink-muted);
+    font-size: 0.85rem;
   }
-  .wizard-pasos li.actual,
   .wizard-pasos li.hecho {
-    opacity: 1;
+    color: var(--ink);
   }
   .wizard-pasos li.actual {
+    color: var(--ink);
     font-weight: 600;
   }
   .numero {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 1.6em;
-    height: 1.6em;
+    width: 1.7em;
+    height: 1.7em;
     border-radius: 50%;
-    border: 2px solid currentColor;
+    border: 1.5px solid var(--line);
     font-size: 0.8em;
+    font-variant-numeric: tabular-nums;
+  }
+  .wizard-pasos li.hecho .numero {
+    border-color: var(--success);
+    color: var(--success);
+  }
+  .wizard-pasos li.actual .numero {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--accent-ink);
   }
 </style>

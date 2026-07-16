@@ -28,6 +28,15 @@ if (Astro.request.method === "POST") {
 }
 
 const pedidos = await listarPedidos(env.DB, negocioId);
+
+const CLASE_BADGE_ESTADO: Record<string, string> = {
+  pendiente: "badge-neutral",
+  confirmado: "badge-success",
+  preparando: "badge-neutral",
+  listo: "badge-success",
+  entregado: "badge-success",
+  cancelado: "badge-critical",
+};
 ---
 
 <Layout title={`Pedidos — ${negocio.nombre}`}>
@@ -56,7 +65,9 @@ const pedidos = await listarPedidos(env.DB, negocioId);
             <td>{p.cliente_telefono}</td>
             <td>${p.total_clp.toLocaleString("es-CL")}</td>
             <td>{p.tipo_entrega === "retiro" ? "Retiro" : p.tipo_entrega === "despacho" ? "Despacho" : "—"}</td>
-            <td>{p.estado}</td>
+            <td>
+              <span class={`badge ${CLASE_BADGE_ESTADO[p.estado] ?? "badge-neutral"}`}>{p.estado}</span>
+            </td>
             <td>
               <form class="inline" method="POST">
                 <input type="hidden" name="pedido_id" value={p.id} />

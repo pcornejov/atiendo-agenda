@@ -44,8 +44,15 @@ const negocios = await listarNegociosConSuscripcion(env.DB);
             <td><a href={`/negocios/${n.id}/editar`}>{n.nombre}</a></td>
             <td>{n.servicio_nombre} ({n.duracion_minutos} min)</td>
             <td>{n.telefono_whatsapp}</td>
-            <td>{n.plan_codigo ?? "—"} {n.suscripcion_estado && `(${n.suscripcion_estado})`}</td>
-            <td>{n.activo ? "Activo" : <span class="badge-inactivo">Inactivo</span>}</td>
+            <td>
+              {n.plan_codigo ?? "—"}
+              {n.suscripcion_estado && (
+                <span class={`badge ${n.suscripcion_estado === "activa" ? "badge-success" : "badge-neutral"}`}>
+                  {n.suscripcion_estado}
+                </span>
+              )}
+            </td>
+            <td>{n.activo ? <span class="badge badge-success">Activo</span> : <span class="badge-inactivo">Inactivo</span>}</td>
             <td>
               <a href={`/negocios/${n.id}/horarios`}>Horarios</a>
               {" · "}
