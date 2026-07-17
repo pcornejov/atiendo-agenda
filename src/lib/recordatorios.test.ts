@@ -89,3 +89,26 @@ test("procesarRecordatorios sin citas pendientes no llama a fetch ni actualiza n
   assert.equal(llamadasFetch, 0);
   assert.deepEqual(actualizados, []);
 });
+
+test("procesarRecordatorios manda los botones Confirmar/Cancelar con el id de la cita en el payload", async () => {
+  const { db } = crearDbFalsa([CITA_1]);
+  const cuerpos: unknown[] = [];
+  const fetchFalso: typeof fetch = async (_url, init) => {
+    cuerpos.push(JSON.parse((init?.body as string) ?? "{}"));
+    return new Response("{}", { status: 200 });
+  };
+
+  await procesarRecordatorios({
+    db,
+    whatsappToken: "tok",
+    nombrePlantilla: "recordatorio_cita",
+    idiomaPlantilla: "es",
+    fetchImpl: fetchFalso,
+  });
+
+  const componentesBoton = (cuerpos[0] as any).template.components.filter((c: any) => c.type === "button");
+  assert.deepEqual(componentesBoton, [
+    { type: "button", sub_type: "quick_reply", index: "0", parameters: [{ type: "payload", payload: "confirmar_cita_1" }] },
+    { type: "button", sub_type: "quick_reply", index: "1", parameters: [{ type: "payload", payload: "cancelar_cita_1" }] },
+  ]);
+});

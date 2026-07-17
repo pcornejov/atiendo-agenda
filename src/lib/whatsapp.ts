@@ -48,6 +48,11 @@ export async function enviarMensajeWhatsApp(
   );
 }
 
+export interface BotonPlantilla {
+  indice: number; // posición del botón dentro de la plantilla aprobada (0 = primero)
+  payload: string; // valor propio que vuelve en el webhook (message.button.payload) cuando el cliente lo toca
+}
+
 export interface EnviarPlantillaParams {
   phoneNumberId: string;
   token: string;
@@ -55,6 +60,10 @@ export interface EnviarPlantillaParams {
   nombrePlantilla: string;
   idioma: string; // código de idioma de la plantilla aprobada en Meta, ej. 'es' o 'es_CL'
   parametros: string[]; // reemplazan {{1}}, {{2}}, ... del body de la plantilla, en orden
+  // Botones quick-reply de la plantilla (el texto de cada botón ya está fijo
+  // en la plantilla aprobada por Meta — acá solo se referencia su posición y
+  // se le asigna el payload dinámico que identifica a qué se refiere).
+  botones?: BotonPlantilla[];
 }
 
 /** Mensaje de plantilla: la única forma de escribirle primero al cliente fuera de la ventana de 24h (ej. el recordatorio). Requiere una plantilla ya aprobada por Meta. */
@@ -62,6 +71,18 @@ export async function enviarPlantillaWhatsApp(
   params: EnviarPlantillaParams,
   fetchImpl: typeof fetch = fetch
 ): Promise<void> {
+  const components = [
+    ...(params.parametros.length > 0
+      ? [{ type: "body", parameters: params.parametros.map((texto) => ({ type: "text", text: texto })) }]
+      : []),
+    ...(params.botones ?? []).map((boton) => ({
+      type: "button",
+      sub_type: "quick_reply",
+      index: String(boton.indice),
+      parameters: [{ type: "payload", payload: boton.payload }],
+    })),
+  ];
+
   await llamarApiMensajes(
     params.phoneNumberId,
     params.token,
@@ -72,9 +93,7 @@ export async function enviarPlantillaWhatsApp(
       template: {
         name: params.nombrePlantilla,
         language: { code: params.idioma },
-        ...(params.parametros.length > 0
-          ? { components: [{ type: "body", parameters: params.parametros.map((texto) => ({ type: "text", text: texto })) }] }
-          : {}),
+        ...(components.length > 0 ? { components } : {}),
       },
     },
     fetchImpl

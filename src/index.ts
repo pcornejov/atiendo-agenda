@@ -3,9 +3,10 @@ import { obtenerSlotsDisponibles } from "./lib/disponibilidad.ts";
 import { interpretarSolicitud } from "./lib/nlu.ts";
 import { moduloAgendamiento } from "./lib/modulos/agendamiento.ts";
 import { utcToZoned, diaSemanaDeFecha, nombreDiaSemana } from "./lib/tz.ts";
-import { parsearMensajeWhatsApp } from "./lib/webhook.ts";
+import { parsearMensajeWhatsApp, parsearBotonWhatsApp } from "./lib/webhook.ts";
 import { procesarMensajeEntrante } from "./lib/flujo.ts";
 import { procesarRecordatorios } from "./lib/recordatorios.ts";
+import { procesarBotonEntrante } from "./lib/confirmacionCita.ts";
 
 export interface Env {
   DB: D1Database;
@@ -112,6 +113,19 @@ export default {
     if (request.method === "POST" && url.pathname === "/webhook") {
       const body = await request.json().catch(() => null);
       const mensaje = body ? parsearMensajeWhatsApp(body) : null;
+      const boton = !mensaje && body ? parsearBotonWhatsApp(body) : null;
+
+      if (boton) {
+        // Respuesta a "Confirmar"/"Cancelar" del recordatorio: se resuelve
+        // directo contra la base, sin pasar por Claude (ver mismo criterio
+        // de manejo de errores que el bloque de `mensaje` de abajo).
+        try {
+          await procesarBotonEntrante({ db: env.DB, whatsappToken: env.WHATSAPP_TOKEN, boton });
+        } catch (error) {
+          console.error(`Error procesando botón de ${boton.clienteTelefono}:`, error);
+        }
+        return new Response("OK", { status: 200 });
+      }
 
       if (mensaje) {
         // Se procesa antes de responder (en vez de ctx.waitUntil) para que

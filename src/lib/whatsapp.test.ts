@@ -104,3 +104,66 @@ test("enviarPlantillaWhatsApp sin parámetros omite el bloque de components", as
   const body = JSON.parse(llamadas[0].init.body as string);
   assert.equal("components" in body.template, false);
 });
+
+test("enviarPlantillaWhatsApp agrega los componentes de botón quick-reply después del body", async () => {
+  const llamadas: Array<{ init: RequestInit }> = [];
+  const fetchFalso: typeof fetch = async (_url, init) => {
+    llamadas.push({ init: init ?? {} });
+    return new Response("{}", { status: 200 });
+  };
+
+  await enviarPlantillaWhatsApp(
+    {
+      phoneNumberId: "1",
+      token: "tok",
+      para: "+56900000000",
+      nombrePlantilla: "recordatorio_cita",
+      idioma: "es",
+      parametros: ["Corte de pelo", "10:00"],
+      botones: [
+        { indice: 0, payload: "confirmar_cita_123" },
+        { indice: 1, payload: "cancelar_cita_123" },
+      ],
+    },
+    fetchFalso
+  );
+
+  const body = JSON.parse(llamadas[0].init.body as string);
+  assert.deepEqual(body.template.components, [
+    {
+      type: "body",
+      parameters: [
+        { type: "text", text: "Corte de pelo" },
+        { type: "text", text: "10:00" },
+      ],
+    },
+    { type: "button", sub_type: "quick_reply", index: "0", parameters: [{ type: "payload", payload: "confirmar_cita_123" }] },
+    { type: "button", sub_type: "quick_reply", index: "1", parameters: [{ type: "payload", payload: "cancelar_cita_123" }] },
+  ]);
+});
+
+test("enviarPlantillaWhatsApp con botones pero sin parámetros de body igual arma components", async () => {
+  const llamadas: Array<{ init: RequestInit }> = [];
+  const fetchFalso: typeof fetch = async (_url, init) => {
+    llamadas.push({ init: init ?? {} });
+    return new Response("{}", { status: 200 });
+  };
+
+  await enviarPlantillaWhatsApp(
+    {
+      phoneNumberId: "1",
+      token: "tok",
+      para: "+56900000000",
+      nombrePlantilla: "sin_body",
+      idioma: "es",
+      parametros: [],
+      botones: [{ indice: 0, payload: "confirmar_cita_9" }],
+    },
+    fetchFalso
+  );
+
+  const body = JSON.parse(llamadas[0].init.body as string);
+  assert.deepEqual(body.template.components, [
+    { type: "button", sub_type: "quick_reply", index: "0", parameters: [{ type: "payload", payload: "confirmar_cita_9" }] },
+  ]);
+});

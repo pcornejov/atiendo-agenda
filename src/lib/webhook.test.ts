@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parsearMensajeWhatsApp } from "./webhook.ts";
+import { parsearMensajeWhatsApp, parsearBotonWhatsApp } from "./webhook.ts";
 
 function payloadMensajeTexto(overrides: { texto?: string; from?: string; nombrePerfil?: string } = {}) {
   return {
@@ -86,4 +86,55 @@ test("sin contacts.profile.name, clienteNombrePerfil queda null", () => {
   delete payload.entry[0].changes[0].value.contacts;
   const resultado = parsearMensajeWhatsApp(payload);
   assert.equal(resultado?.clienteNombrePerfil, null);
+});
+
+function payloadBoton(overrides: { payload?: string; from?: string } = {}) {
+  return {
+    object: "whatsapp_business_account",
+    entry: [
+      {
+        id: "entry-1",
+        changes: [
+          {
+            value: {
+              messaging_product: "whatsapp",
+              metadata: { display_phone_number: "56900000000", phone_number_id: "123456789012345" },
+              messages: [
+                {
+                  from: overrides.from ?? "56912345678",
+                  id: "wamid.xyz",
+                  timestamp: "1721059200",
+                  type: "button",
+                  button: { text: "Confirmar", payload: overrides.payload ?? "confirmar_cita_123" },
+                },
+              ],
+            },
+            field: "messages",
+          },
+        ],
+      },
+    ],
+  };
+}
+
+test("parsea una respuesta de botón de plantilla (type: button)", () => {
+  const resultado = parsearBotonWhatsApp(payloadBoton());
+  assert.deepEqual(resultado, {
+    phoneNumberId: "123456789012345",
+    clienteTelefono: "+56912345678",
+    payload: "confirmar_cita_123",
+  });
+});
+
+test("parsearBotonWhatsApp ignora un mensaje de texto normal", () => {
+  assert.equal(parsearBotonWhatsApp(payloadMensajeTexto()), null);
+});
+
+test("parsearMensajeWhatsApp ignora una respuesta de botón (type: button)", () => {
+  assert.equal(parsearMensajeWhatsApp(payloadBoton()), null);
+});
+
+test("parsearBotonWhatsApp con payload sin 'entry' devuelve null en vez de lanzar", () => {
+  assert.equal(parsearBotonWhatsApp({}), null);
+  assert.equal(parsearBotonWhatsApp(null), null);
 });

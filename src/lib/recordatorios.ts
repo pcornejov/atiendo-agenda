@@ -61,6 +61,14 @@ export async function procesarRecordatorios(params: {
           nombrePlantilla: params.nombrePlantilla,
           idioma: params.idiomaPlantilla,
           parametros: [cita.servicio_nombre, horaHHMM],
+          // Asume que la plantilla aprobada en Meta tiene dos botones
+          // quick-reply en este orden: "Confirmar" (índice 0) y "Cancelar"
+          // (índice 1) — ver confirmacionCita.ts para cómo se procesa la
+          // respuesta.
+          botones: [
+            { indice: 0, payload: `confirmar_cita_${cita.id}` },
+            { indice: 1, payload: `cancelar_cita_${cita.id}` },
+          ],
         },
         fetchImpl
       );
