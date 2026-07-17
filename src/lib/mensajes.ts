@@ -109,6 +109,24 @@ export function formatearSinItemsValidos(): string {
   return "No reconocí ningún ítem de nuestro menú en tu mensaje. ¿Puedes decirme qué quieres pedir?";
 }
 
+export function formatearPreguntaAlgoMas(items: ItemResumen[], totalClp: number): string {
+  return [
+    "Anotado. Hasta ahora tu pedido es:",
+    ...formatearLineasPedido(items),
+    `Total: $${totalClp.toLocaleString("es-CL")}`,
+    "",
+    "¿Quieres agregar algo más? Si no, escribe \"no\".",
+  ].join("\n");
+}
+
+export function formatearPreguntaComentario(): string {
+  return "¿Algún comentario para tu pedido? (ej. \"sin cebolla\", \"bien cocida\"). Si no, escribe \"no\".";
+}
+
+export function formatearPreguntaDireccion(): string {
+  return "¿Cuál es la dirección de despacho?";
+}
+
 export function formatearPreguntaTipoEntrega(): string {
   return "¿Retiras el pedido en el local, o prefieres que te lo despachemos?";
 }
@@ -117,23 +135,44 @@ export function formatearRepetirPreguntaTipoEntrega(): string {
   return "No entendí tu respuesta. ¿Retiras el pedido en el local, o prefieres despacho?";
 }
 
-export function formatearResumenPedido(items: ItemResumen[], totalClp: number, tipoEntrega: TipoEntrega): string {
+function formatearLineasExtra(tipoEntrega: TipoEntrega, comentario: string | null, direccionDespacho: string | null): string[] {
+  return [
+    ...(tipoEntrega === "despacho" && direccionDespacho ? [`Dirección: ${direccionDespacho}`] : []),
+    ...(comentario ? [`Comentario: ${comentario}`] : []),
+  ];
+}
+
+export function formatearResumenPedido(
+  items: ItemResumen[],
+  totalClp: number,
+  tipoEntrega: TipoEntrega,
+  comentario: string | null,
+  direccionDespacho: string | null
+): string {
   return [
     "Tu pedido:",
     ...formatearLineasPedido(items),
     `Total: $${totalClp.toLocaleString("es-CL")}`,
     formatearTipoEntregaTexto(tipoEntrega),
+    ...formatearLineasExtra(tipoEntrega, comentario, direccionDespacho),
     "",
     "¿Confirmas el pedido?",
   ].join("\n");
 }
 
-export function formatearRepetirConfirmacionPedido(items: ItemResumen[], totalClp: number, tipoEntrega: TipoEntrega): string {
+export function formatearRepetirConfirmacionPedido(
+  items: ItemResumen[],
+  totalClp: number,
+  tipoEntrega: TipoEntrega,
+  comentario: string | null,
+  direccionDespacho: string | null
+): string {
   return [
     "No entendí tu respuesta. Tu pedido pendiente es:",
     ...formatearLineasPedido(items),
     `Total: $${totalClp.toLocaleString("es-CL")}`,
     formatearTipoEntregaTexto(tipoEntrega),
+    ...formatearLineasExtra(tipoEntrega, comentario, direccionDespacho),
     "",
     "Responde \"sí\" para confirmar, o \"cancelar\" si ya no lo quieres.",
   ].join("\n");

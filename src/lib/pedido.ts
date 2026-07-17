@@ -40,14 +40,24 @@ export async function crearPedido(
     items: ItemPedidoParaCrear[];
     totalClp: number;
     tipoEntrega: "retiro" | "despacho";
+    direccionDespacho: string | null; // solo tiene sentido si tipoEntrega === "despacho"
+    notas: string | null; // comentario/personalización del pedido completo
   }
 ): Promise<{ id: number }> {
   const resultado = await db
     .prepare(
-      `INSERT INTO pedidos (negocio_id, cliente_telefono, cliente_nombre, estado, total_clp, tipo_entrega)
-       VALUES (?, ?, ?, 'pendiente', ?, ?)`
+      `INSERT INTO pedidos (negocio_id, cliente_telefono, cliente_nombre, estado, total_clp, tipo_entrega, direccion_despacho, notas)
+       VALUES (?, ?, ?, 'pendiente', ?, ?, ?, ?)`
     )
-    .bind(params.negocioId, params.clienteTelefono, params.clienteNombre, params.totalClp, params.tipoEntrega)
+    .bind(
+      params.negocioId,
+      params.clienteTelefono,
+      params.clienteNombre,
+      params.totalClp,
+      params.tipoEntrega,
+      params.direccionDespacho,
+      params.notas
+    )
     .run();
   const pedidoId = resultado.meta.last_row_id;
 

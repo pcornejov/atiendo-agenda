@@ -10,6 +10,9 @@ import {
   formatearFallback,
   formatearMenu,
   formatearSinMenu,
+  formatearPreguntaAlgoMas,
+  formatearPreguntaComentario,
+  formatearPreguntaDireccion,
   formatearResumenPedido,
   formatearRepetirConfirmacionPedido,
   formatearPedidoConfirmado,
@@ -85,18 +88,35 @@ const ITEMS_PEDIDO = [
 ];
 
 test("formatearResumenPedido incluye cada ítem, su subtotal, el total, y el tipo de entrega", () => {
-  const texto = formatearResumenPedido(ITEMS_PEDIDO, 5200, "retiro");
+  const texto = formatearResumenPedido(ITEMS_PEDIDO, 5200, "retiro", null, null);
   assert.match(texto, /2x Empanada de pino — \$4\.000/);
   assert.match(texto, /1x Bebida 350ml — \$1\.200/);
   assert.match(texto, /Total: \$5\.200/);
   assert.match(texto, /Retiro en el local/);
 });
 
+test("formatearResumenPedido incluye la dirección solo si es despacho y viene informada", () => {
+  const conDireccion = formatearResumenPedido(ITEMS_PEDIDO, 5200, "despacho", null, "Av. Siempre Viva 742");
+  assert.match(conDireccion, /Dirección: Av\. Siempre Viva 742/);
+
+  const retiroConDireccionIgnorada = formatearResumenPedido(ITEMS_PEDIDO, 5200, "retiro", null, "Av. Siempre Viva 742");
+  assert.doesNotMatch(retiroConDireccionIgnorada, /Dirección/);
+});
+
+test("formatearResumenPedido incluye el comentario solo si no es null", () => {
+  const conComentario = formatearResumenPedido(ITEMS_PEDIDO, 5200, "retiro", "sin cebolla", null);
+  assert.match(conComentario, /Comentario: sin cebolla/);
+
+  const sinComentario = formatearResumenPedido(ITEMS_PEDIDO, 5200, "retiro", null, null);
+  assert.doesNotMatch(sinComentario, /Comentario/);
+});
+
 test("formatearRepetirConfirmacionPedido incluye el resumen del pedido pendiente y el despacho", () => {
-  const texto = formatearRepetirConfirmacionPedido(ITEMS_PEDIDO, 5200, "despacho");
+  const texto = formatearRepetirConfirmacionPedido(ITEMS_PEDIDO, 5200, "despacho", null, "Av. Siempre Viva 742");
   assert.match(texto, /2x Empanada de pino/);
   assert.match(texto, /Total: \$5\.200/);
   assert.match(texto, /Despacho/);
+  assert.match(texto, /Dirección: Av\. Siempre Viva 742/);
 });
 
 test("formatearPedidoConfirmado incluye el id del pedido y el total", () => {
@@ -121,4 +141,16 @@ test("formatearMiPedido no falla si tipo_entrega es null", () => {
 test("formatearPreguntaTipoEntrega y formatearRepetirPreguntaTipoEntrega no lanzan y devuelven texto no vacío", () => {
   assert.ok(formatearPreguntaTipoEntrega().length > 0);
   assert.ok(formatearRepetirPreguntaTipoEntrega().length > 0);
+});
+
+test("formatearPreguntaAlgoMas recapitula el carrito y pregunta si falta algo", () => {
+  const texto = formatearPreguntaAlgoMas(ITEMS_PEDIDO, 5200);
+  assert.match(texto, /2x Empanada de pino — \$4\.000/);
+  assert.match(texto, /Total: \$5\.200/);
+  assert.match(texto, /¿Quieres agregar algo más\?/);
+});
+
+test("formatearPreguntaComentario y formatearPreguntaDireccion no lanzan y devuelven texto no vacío", () => {
+  assert.ok(formatearPreguntaComentario().length > 0);
+  assert.ok(formatearPreguntaDireccion().length > 0);
 });
