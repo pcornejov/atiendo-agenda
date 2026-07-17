@@ -2,6 +2,7 @@
 import { env } from "cloudflare:workers";
 import WizardLayout from "../../layouts/WizardLayout.astro";
 import { obtenerNegocio, obtenerPlanPorCodigo, asignarPlanManual } from "../../lib/db.ts";
+import { INFO_PLANES } from "../../lib/planesInfo.ts";
 
 const usuario = Astro.locals.usuario;
 if (!usuario || usuario.rol !== "dueno" || !usuario.negocio_id) {
@@ -48,6 +49,13 @@ if (Astro.request.method === "POST") {
   <div class="tarjeta-precio">
     <span class="precio">${plan.precio_mensual_clp.toLocaleString("es-CL")}<small> / mes</small></span>
     <p>Vigente por 30 días desde la contratación.</p>
+    {INFO_PLANES[plan.codigo] && (
+      <ul class="incluye">
+        {INFO_PLANES[plan.codigo].incluye.map((item) => (
+          <li>{item}</li>
+        ))}
+      </ul>
+    )}
   </div>
 
   <form method="POST">
@@ -90,5 +98,24 @@ if (Astro.request.method === "POST") {
     margin: 0.4rem 0 0;
     color: var(--ink-muted);
     font-size: 0.9rem;
+  }
+  .tarjeta-precio ul.incluye {
+    list-style: none;
+    padding: 0;
+    margin: 1rem 0 0;
+    display: grid;
+    gap: 0.4rem;
+    font-size: 0.9rem;
+    color: var(--ink);
+  }
+  .tarjeta-precio ul.incluye li {
+    display: flex;
+    gap: 0.5rem;
+    align-items: baseline;
+  }
+  .tarjeta-precio ul.incluye li::before {
+    content: "✓";
+    color: var(--success);
+    font-weight: 700;
   }
 </style>

@@ -62,7 +62,7 @@ const CLASE_BADGE_ESTADO: Record<string, string> = {
           <tr>
             <td>{utcToZonedTexto(p.created_at, negocio.timezone)}</td>
             <td>{p.cliente_nombre ?? "—"}</td>
-            <td>{p.cliente_telefono}</td>
+            <td><a href={`/negocios/${negocioId}/clientes/${encodeURIComponent(p.cliente_telefono)}`}>{p.cliente_telefono}</a></td>
             <td>${p.total_clp.toLocaleString("es-CL")}</td>
             <td>{p.tipo_entrega === "retiro" ? "Retiro" : p.tipo_entrega === "despacho" ? "Despacho" : "—"}</td>
             <td>

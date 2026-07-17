@@ -172,6 +172,20 @@ export async function listarCitasProximas(db: D1Database, negocioId: number): Pr
   return resultado.results;
 }
 
+/** Historial completo (todos los estados) de citas de un cliente en un negocio — para su ficha. */
+export async function listarCitasPorCliente(db: D1Database, negocioId: number, telefono: string): Promise<CitaProxima[]> {
+  const resultado = await db
+    .prepare(
+      `SELECT id, cliente_telefono, cliente_nombre, fecha_hora_inicio, fecha_hora_fin, estado
+       FROM citas
+       WHERE negocio_id = ? AND cliente_telefono = ?
+       ORDER BY fecha_hora_inicio DESC`
+    )
+    .bind(negocioId, telefono)
+    .all<CitaProxima>();
+  return resultado.results;
+}
+
 /** Cancela una cita específica por id (a diferencia de cancelarCitaActiva del bot, que cancela "la próxima" de un cliente). */
 export async function cancelarCitaPorId(db: D1Database, negocioId: number, citaId: number): Promise<void> {
   await db
@@ -489,6 +503,18 @@ export async function listarPedidos(db: D1Database, negocioId: number): Promise<
        FROM pedidos WHERE negocio_id = ? AND estado != 'cancelado' ORDER BY created_at DESC`
     )
     .bind(negocioId)
+    .all<Pedido>();
+  return resultado.results;
+}
+
+/** Historial completo (todos los estados) de pedidos de un cliente en un negocio — para su ficha. */
+export async function listarPedidosPorCliente(db: D1Database, negocioId: number, telefono: string): Promise<Pedido[]> {
+  const resultado = await db
+    .prepare(
+      `SELECT id, cliente_telefono, cliente_nombre, estado, total_clp, tipo_entrega, created_at
+       FROM pedidos WHERE negocio_id = ? AND cliente_telefono = ? ORDER BY created_at DESC`
+    )
+    .bind(negocioId, telefono)
     .all<Pedido>();
   return resultado.results;
 }

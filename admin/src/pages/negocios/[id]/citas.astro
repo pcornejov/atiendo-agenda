@@ -48,7 +48,7 @@ const citas = await listarCitasProximas(env.DB, negocioId);
           <tr>
             <td>{utcToZonedTexto(c.fecha_hora_inicio, negocio.timezone)}</td>
             <td>{c.cliente_nombre ?? "—"}</td>
-            <td>{c.cliente_telefono}</td>
+            <td><a href={`/negocios/${negocioId}/clientes/${encodeURIComponent(c.cliente_telefono)}`}>{c.cliente_telefono}</a></td>
             <td>
               {c.estado === "confirmada" ? (
                 <span class="badge badge-success">Confirmada</span>

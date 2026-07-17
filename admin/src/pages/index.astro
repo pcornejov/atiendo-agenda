@@ -5,6 +5,7 @@ import ChatDemo from "../components/ChatDemo.astro";
 import { listarPlanesActivos } from "../lib/db.ts";
 import { DEMO_AGENDA, DEMO_COMIDA, DEMO_DENTAL, DEMO_CAFETERIA } from "../lib/demoMensajes.ts";
 import { redirigirSegunUsuario } from "../lib/auth.ts";
+import { INFO_PLANES } from "../lib/planesInfo.ts";
 
 // Landing pública — quien ya tiene sesión no necesita verla, va directo a su panel.
 if (Astro.locals.usuario) {
@@ -12,26 +13,6 @@ if (Astro.locals.usuario) {
 }
 
 const planes = await listarPlanesActivos(env.DB);
-const NOMBRES_PLAN: Record<string, { nombre: string; descripcion: string; incluye: string[] }> = {
-  basico: {
-    nombre: "Agenda de horas",
-    descripcion: "Tus clientes reservan y consultan horas por WhatsApp.",
-    incluye: [
-      "Agenda ilimitada por WhatsApp, 24/7",
-      "Recordatorios automáticos de citas",
-      "Panel para administrar horarios y citas",
-    ],
-  },
-  nivel2: {
-    nombre: "Venta de comida",
-    descripcion: "Tus clientes ven la carta y hacen pedidos por WhatsApp.",
-    incluye: [
-      "Pedidos ilimitados por WhatsApp, 24/7",
-      "Carga de carta por foto, PDF o Excel",
-      "Panel para administrar menú y pedidos",
-    ],
-  },
-};
 ---
 
 <html lang="es">
@@ -557,7 +538,7 @@ const NOMBRES_PLAN: Record<string, { nombre: string; descripcion: string; incluy
         <p class="subtitulo">Un plan por tipo de negocio, vigente por 30 días.</p>
         <div class="precios">
           {planes.map((plan) => {
-            const info = NOMBRES_PLAN[plan.codigo] ?? { nombre: plan.nombre, descripcion: "" };
+            const info = INFO_PLANES[plan.codigo] ?? { nombre: plan.nombre, descripcion: "", incluye: [] };
             return (
               <div class="tarjeta-precio">
                 <h3>{info.nombre}</h3>
