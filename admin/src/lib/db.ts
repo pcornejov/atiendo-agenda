@@ -493,6 +493,8 @@ export interface Pedido {
   estado: string;
   total_clp: number;
   tipo_entrega: "retiro" | "despacho" | null;
+  direccion_despacho: string | null;
+  notas: string | null;
   created_at: string;
 }
 
@@ -500,7 +502,7 @@ export interface Pedido {
 export async function listarPedidos(db: D1Database, negocioId: number): Promise<Pedido[]> {
   const resultado = await db
     .prepare(
-      `SELECT id, cliente_telefono, cliente_nombre, estado, total_clp, tipo_entrega, created_at
+      `SELECT id, cliente_telefono, cliente_nombre, estado, total_clp, tipo_entrega, direccion_despacho, notas, created_at
        FROM pedidos WHERE negocio_id = ? AND estado != 'cancelado' ORDER BY created_at DESC`
     )
     .bind(negocioId)
@@ -512,7 +514,7 @@ export async function listarPedidos(db: D1Database, negocioId: number): Promise<
 export async function listarPedidosPorCliente(db: D1Database, negocioId: number, telefono: string): Promise<Pedido[]> {
   const resultado = await db
     .prepare(
-      `SELECT id, cliente_telefono, cliente_nombre, estado, total_clp, tipo_entrega, created_at
+      `SELECT id, cliente_telefono, cliente_nombre, estado, total_clp, tipo_entrega, direccion_despacho, notas, created_at
        FROM pedidos WHERE negocio_id = ? AND cliente_telefono = ? ORDER BY created_at DESC`
     )
     .bind(negocioId, telefono)

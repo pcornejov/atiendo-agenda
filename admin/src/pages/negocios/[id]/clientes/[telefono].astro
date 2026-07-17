@@ -88,6 +88,8 @@ const CLASE_BADGE_PEDIDO: Record<string, string> = {
             <th>Fecha</th>
             <th>Total</th>
             <th>Entrega</th>
+            <th>Dirección</th>
+            <th>Notas</th>
             <th>Estado</th>
           </tr>
         </thead>
@@ -97,6 +99,8 @@ const CLASE_BADGE_PEDIDO: Record<string, string> = {
               <td>{utcToZonedTexto(p.created_at, negocio.timezone)}</td>
               <td>${p.total_clp.toLocaleString("es-CL")}</td>
               <td>{p.tipo_entrega === "retiro" ? "Retiro" : p.tipo_entrega === "despacho" ? "Despacho" : "—"}</td>
+              <td>{p.direccion_despacho ?? "—"}</td>
+              <td>{p.notas ?? "—"}</td>
               <td><span class={`badge ${CLASE_BADGE_PEDIDO[p.estado] ?? "badge-neutral"}`}>{p.estado}</span></td>
             </tr>
           ))}

@@ -53,6 +53,8 @@ const CLASE_BADGE_ESTADO: Record<string, string> = {
           <th>Teléfono</th>
           <th>Total</th>
           <th>Entrega</th>
+          <th>Dirección</th>
+          <th>Notas</th>
           <th>Estado</th>
           <th></th>
         </tr>
@@ -65,6 +67,8 @@ const CLASE_BADGE_ESTADO: Record<string, string> = {
             <td><a href={`/negocios/${negocioId}/clientes/${encodeURIComponent(p.cliente_telefono)}`}>{p.cliente_telefono}</a></td>
             <td>${p.total_clp.toLocaleString("es-CL")}</td>
             <td>{p.tipo_entrega === "retiro" ? "Retiro" : p.tipo_entrega === "despacho" ? "Despacho" : "—"}</td>
+            <td>{p.direccion_despacho ?? "—"}</td>
+            <td>{p.notas ?? "—"}</td>
             <td>
               <span class={`badge ${CLASE_BADGE_ESTADO[p.estado] ?? "badge-neutral"}`}>{p.estado}</span>
             </td>
