@@ -31,10 +31,19 @@ if (Astro.request.method === "POST") {
         const nombre = String(form.get(`nombre_${i}`) ?? "").trim();
         const descripcion = String(form.get(`descripcion_${i}`) ?? "").trim();
         const precioClp = Number(form.get(`precio_${i}`));
+        const categoria = String(form.get(`categoria_${i}`) ?? "").trim();
         if (nombre.length === 0 || !Number.isInteger(precioClp) || precioClp < 0) return null;
-        return { nombre, descripcion: descripcion.length > 0 ? descripcion : null, precioClp };
+        return {
+          nombre,
+          descripcion: descripcion.length > 0 ? descripcion : null,
+          precioClp,
+          categoria: categoria.length > 0 ? categoria : null,
+        };
       })
-      .filter((item): item is { nombre: string; descripcion: string | null; precioClp: number } => item !== null);
+      .filter(
+        (item): item is { nombre: string; descripcion: string | null; precioClp: number; categoria: string | null } =>
+          item !== null
+      );
 
     if (itemsAGuardar.length > 0) {
       await crearMenuItemsEnLote(env.DB, negocioId, itemsAGuardar);
@@ -65,6 +74,10 @@ if (Astro.request.method === "POST") {
         <label>
           Descripción
           <input type="text" name={`descripcion_${i}`} value={item.descripcion ?? ""} />
+        </label>
+        <label>
+          Categoría
+          <input type="text" name={`categoria_${i}`} value={item.categoria ?? ""} placeholder="ej. Hamburguesas" />
         </label>
         <label>
           Precio (CLP)

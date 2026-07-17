@@ -17,18 +17,24 @@ function clienteFalso(inputToolUse: unknown): ClienteClaude {
 
 const ARCHIVO_DE_PRUEBA: ArchivoCarta = { tipo: "imagen", mediaType: "image/jpeg", base64: "ZmFrZQ==" };
 
-test("extraerItemsDeCarta mapea items válidos, recortando nombre y descripción", async () => {
+test("extraerItemsDeCarta mapea items válidos, recortando nombre, descripción y categoría", async () => {
   const client = clienteFalso({
     items: [
-      { nombre: "  Empanada de pino  ", descripcion: "  Horneada  ", precio_clp: 2000 },
-      { nombre: "Bebida 350ml", descripcion: null, precio_clp: 1200 },
+      { nombre: "  Empanada de pino  ", descripcion: "  Horneada  ", precio_clp: 2000, categoria: "  Entradas  " },
+      { nombre: "Bebida 350ml", descripcion: null, precio_clp: 1200, categoria: null },
     ],
   });
   const items = await extraerItemsDeCarta(client, [ARCHIVO_DE_PRUEBA]);
   assert.deepEqual(items, [
-    { nombre: "Empanada de pino", descripcion: "Horneada", precioClp: 2000 },
-    { nombre: "Bebida 350ml", descripcion: null, precioClp: 1200 },
+    { nombre: "Empanada de pino", descripcion: "Horneada", precioClp: 2000, categoria: "Entradas" },
+    { nombre: "Bebida 350ml", descripcion: null, precioClp: 1200, categoria: null },
   ]);
+});
+
+test("extraerItemsDeCarta trata una categoría vacía o solo con espacios como null", async () => {
+  const client = clienteFalso({ items: [{ nombre: "Item", descripcion: null, precio_clp: 500, categoria: "   " }] });
+  const items = await extraerItemsDeCarta(client, [ARCHIVO_DE_PRUEBA]);
+  assert.equal(items[0].categoria, null);
 });
 
 test("extraerItemsDeCarta descarta ítems sin nombre", async () => {
@@ -50,9 +56,9 @@ test("extraerItemsDeCarta descarta ítems con precio inválido (negativo, no ent
 });
 
 test("extraerItemsDeCarta acepta precio 0", async () => {
-  const client = clienteFalso({ items: [{ nombre: "Cortesía", descripcion: null, precio_clp: 0 }] });
+  const client = clienteFalso({ items: [{ nombre: "Cortesía", descripcion: null, precio_clp: 0, categoria: null }] });
   const items = await extraerItemsDeCarta(client, [ARCHIVO_DE_PRUEBA]);
-  assert.deepEqual(items, [{ nombre: "Cortesía", descripcion: null, precioClp: 0 }]);
+  assert.deepEqual(items, [{ nombre: "Cortesía", descripcion: null, precioClp: 0, categoria: null }]);
 });
 
 test("extraerItemsDeCarta con lista de archivos vacía no llama a Claude y devuelve []", async () => {
@@ -122,7 +128,11 @@ test("extraerItemsDeCarta acepta un archivo de tipo texto (carta leída desde Ex
         contenidoRecibido = bloqueTexto?.text ?? null;
         return {
           content: [
-            { type: "tool_use", name: "extraer_items_menu", input: { items: [{ nombre: "Item", descripcion: null, precio_clp: 500 }] } },
+            {
+              type: "tool_use",
+              name: "extraer_items_menu",
+              input: { items: [{ nombre: "Item", descripcion: null, precio_clp: 500, categoria: null }] },
+            },
           ],
         };
       },
@@ -130,6 +140,6 @@ test("extraerItemsDeCarta acepta un archivo de tipo texto (carta leída desde Ex
   };
   const archivoTexto: ArchivoCarta = { tipo: "texto", contenido: "Nombre,Precio\nItem,500" };
   const items = await extraerItemsDeCarta(client, [archivoTexto]);
-  assert.deepEqual(items, [{ nombre: "Item", descripcion: null, precioClp: 500 }]);
+  assert.deepEqual(items, [{ nombre: "Item", descripcion: null, precioClp: 500, categoria: null }]);
   assert.equal(contenidoRecibido, "Nombre,Precio\nItem,500");
 });

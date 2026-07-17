@@ -36,12 +36,13 @@ export interface ItemMenuExtraido {
   nombre: string;
   descripcion: string | null;
   precioClp: number;
+  categoria: string | null;
 }
 
 const TOOL_EXTRAER_ITEMS: Anthropic.Tool = {
   name: "extraer_items_menu",
   description:
-    "Extrae los ítems de comida/bebida de la carta de un negocio (foto o PDF) con su nombre, una descripción breve si aparece (ej. ingredientes, sabores), y el precio en pesos chilenos (sin el símbolo $ ni puntos de miles).",
+    "Extrae los ítems de comida/bebida de la carta de un negocio (foto o PDF) con su nombre, una descripción breve si aparece (ej. ingredientes, sabores), el precio en pesos chilenos (sin el símbolo $ ni puntos de miles), y la categoría a la que pertenece.",
   input_schema: {
     type: "object",
     properties: {
@@ -57,8 +58,13 @@ const TOOL_EXTRAER_ITEMS: Anthropic.Tool = {
               description: "Detalle breve si la carta lo menciona (ingredientes, sabores, tamaño). null si no hay.",
             },
             precio_clp: { type: "integer" },
+            categoria: {
+              type: ["string", "null"],
+              description:
+                "Categoría del ítem (ej. Hamburguesas, Pizzas, Bebidas, Postres). Usa el agrupamiento tal como aparece en la carta si la tiene; si no está agrupada, infiere una categoría razonable y corta (una o dos palabras). null solo si de verdad no se puede inferir ninguna.",
+            },
           },
-          required: ["nombre", "descripcion", "precio_clp"],
+          required: ["nombre", "descripcion", "precio_clp", "categoria"],
         },
       },
     },
@@ -104,7 +110,7 @@ export async function extraerItemsDeCarta(
     model: MODELO_SONNET,
     max_tokens: 4096,
     system:
-      "Eres un asistente que ayuda a un negocio a digitalizar su carta/menú. Lee la imagen o PDF que te pasan y extrae cada producto con su nombre, descripción (si la hay) y precio, usando la herramienta extraer_items_menu.",
+      "Eres un asistente que ayuda a un negocio a digitalizar su carta/menú. Lee la imagen o PDF que te pasan y extrae cada producto con su nombre, descripción (si la hay), precio y categoría, usando la herramienta extraer_items_menu.",
     messages: [{ role: "user", content: construirContentBlocks(archivos) }],
     tools: [TOOL_EXTRAER_ITEMS],
     tool_choice: { type: "tool", name: "extraer_items_menu" },
@@ -126,6 +132,7 @@ export async function extraerItemsDeCarta(
       nombre: typeof item.nombre === "string" ? item.nombre.trim() : "",
       descripcion: typeof item.descripcion === "string" && item.descripcion.trim().length > 0 ? item.descripcion.trim() : null,
       precioClp: Number(item.precio_clp),
+      categoria: typeof item.categoria === "string" && item.categoria.trim().length > 0 ? item.categoria.trim() : null,
     }))
     .filter((item) => item.nombre.length > 0 && Number.isInteger(item.precioClp) && item.precioClp >= 0);
 }

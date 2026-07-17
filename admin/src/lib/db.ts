@@ -423,6 +423,7 @@ export interface MenuItem {
   nombre: string;
   descripcion: string | null;
   precio_clp: number;
+  categoria: string | null;
   disponible: number;
   orden: number;
 }
@@ -438,13 +439,13 @@ export async function listarMenu(db: D1Database, negocioId: number): Promise<Men
 export async function crearMenuItem(
   db: D1Database,
   negocioId: number,
-  params: { nombre: string; descripcion: string | null; precioClp: number; orden: number }
+  params: { nombre: string; descripcion: string | null; precioClp: number; categoria: string | null; orden: number }
 ): Promise<void> {
   await db
     .prepare(
-      "INSERT INTO menu_items (negocio_id, nombre, descripcion, precio_clp, orden) VALUES (?, ?, ?, ?, ?)"
+      "INSERT INTO menu_items (negocio_id, nombre, descripcion, precio_clp, categoria, orden) VALUES (?, ?, ?, ?, ?, ?)"
     )
-    .bind(negocioId, params.nombre, params.descripcion, params.precioClp, params.orden)
+    .bind(negocioId, params.nombre, params.descripcion, params.precioClp, params.categoria, params.orden)
     .run();
 }
 
@@ -452,16 +453,16 @@ export async function crearMenuItem(
 export async function crearMenuItemsEnLote(
   db: D1Database,
   negocioId: number,
-  items: Array<{ nombre: string; descripcion: string | null; precioClp: number }>
+  items: Array<{ nombre: string; descripcion: string | null; precioClp: number; categoria: string | null }>
 ): Promise<void> {
   if (items.length === 0) return;
   await db.batch(
     items.map((item, i) =>
       db
         .prepare(
-          "INSERT INTO menu_items (negocio_id, nombre, descripcion, precio_clp, orden) VALUES (?, ?, ?, ?, ?)"
+          "INSERT INTO menu_items (negocio_id, nombre, descripcion, precio_clp, categoria, orden) VALUES (?, ?, ?, ?, ?, ?)"
         )
-        .bind(negocioId, item.nombre, item.descripcion, item.precioClp, i)
+        .bind(negocioId, item.nombre, item.descripcion, item.precioClp, item.categoria, i)
     )
   );
 }

@@ -46,6 +46,7 @@ if (Astro.request.method === "POST") {
     const nombre = String(form.get("nombre") ?? "").trim();
     const descripcion = String(form.get("descripcion") ?? "").trim();
     const precioClp = Number(form.get("precio_clp"));
+    const categoria = String(form.get("categoria") ?? "").trim();
 
     if (nombre.length === 0) {
       error = "El nombre no puede estar vacío.";
@@ -56,6 +57,7 @@ if (Astro.request.method === "POST") {
         nombre,
         descripcion: descripcion.length > 0 ? descripcion : null,
         precioClp,
+        categoria: categoria.length > 0 ? categoria : null,
         orden: 0,
       });
     }
@@ -80,6 +82,7 @@ const menu = await listarMenu(env.DB, negocioId);
         <tr>
           <th>Nombre</th>
           <th>Descripción</th>
+          <th>Categoría</th>
           <th>Precio</th>
           <th>Estado</th>
           <th></th>
@@ -90,6 +93,7 @@ const menu = await listarMenu(env.DB, negocioId);
           <tr>
             <td>{item.nombre}</td>
             <td>{item.descripcion ?? "—"}</td>
+            <td>{item.categoria ?? "—"}</td>
             <td>${item.precio_clp.toLocaleString("es-CL")}</td>
             <td>{item.disponible ? "Disponible" : <span class="badge-inactivo">No disponible</span>}</td>
             <td>
@@ -134,6 +138,10 @@ const menu = await listarMenu(env.DB, negocioId);
     <label>
       Descripción (opcional)
       <input type="text" name="descripcion" />
+    </label>
+    <label>
+      Categoría (opcional)
+      <input type="text" name="categoria" placeholder="ej. Hamburguesas" />
     </label>
     <label>
       Precio (CLP)
