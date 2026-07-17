@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parsearMensajeWhatsApp, parsearBotonWhatsApp } from "./webhook.ts";
+import { parsearMensajeWhatsApp, parsearBotonWhatsApp, parsearListaWhatsApp } from "./webhook.ts";
 
 function payloadMensajeTexto(overrides: { texto?: string; from?: string; nombrePerfil?: string } = {}) {
   return {
@@ -137,4 +137,61 @@ test("parsearMensajeWhatsApp ignora una respuesta de botón (type: button)", () 
 test("parsearBotonWhatsApp con payload sin 'entry' devuelve null en vez de lanzar", () => {
   assert.equal(parsearBotonWhatsApp({}), null);
   assert.equal(parsearBotonWhatsApp(null), null);
+});
+
+function payloadLista(overrides: { id?: string; title?: string; from?: string } = {}) {
+  return {
+    object: "whatsapp_business_account",
+    entry: [
+      {
+        id: "entry-1",
+        changes: [
+          {
+            value: {
+              messaging_product: "whatsapp",
+              metadata: { display_phone_number: "56900000000", phone_number_id: "123456789012345" },
+              messages: [
+                {
+                  from: overrides.from ?? "56912345678",
+                  id: "wamid.xyz",
+                  timestamp: "1721059200",
+                  type: "interactive",
+                  interactive: {
+                    type: "list_reply",
+                    list_reply: { id: overrides.id ?? "cat:Hamburguesas", title: overrides.title ?? "Hamburguesas" },
+                  },
+                },
+              ],
+            },
+            field: "messages",
+          },
+        ],
+      },
+    ],
+  };
+}
+
+test("parsea una respuesta de lista interactiva (type: interactive, list_reply)", () => {
+  const resultado = parsearListaWhatsApp(payloadLista());
+  assert.deepEqual(resultado, {
+    phoneNumberId: "123456789012345",
+    clienteTelefono: "+56912345678",
+    id: "cat:Hamburguesas",
+    titulo: "Hamburguesas",
+  });
+});
+
+test("parsearListaWhatsApp ignora un mensaje de texto normal y una respuesta de botón", () => {
+  assert.equal(parsearListaWhatsApp(payloadMensajeTexto()), null);
+  assert.equal(parsearListaWhatsApp(payloadBoton()), null);
+});
+
+test("parsearMensajeWhatsApp y parsearBotonWhatsApp ignoran una respuesta de lista", () => {
+  assert.equal(parsearMensajeWhatsApp(payloadLista()), null);
+  assert.equal(parsearBotonWhatsApp(payloadLista()), null);
+});
+
+test("parsearListaWhatsApp con payload sin 'entry' devuelve null en vez de lanzar", () => {
+  assert.equal(parsearListaWhatsApp({}), null);
+  assert.equal(parsearListaWhatsApp(null), null);
 });

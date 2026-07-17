@@ -99,3 +99,57 @@ export async function enviarPlantillaWhatsApp(
     fetchImpl
   );
 }
+
+export interface FilaLista {
+  id: string; // vuelve tal cual en el webhook (interactive.list_reply.id) al tocarla
+  titulo: string; // máx. 24 caracteres (límite de WhatsApp)
+  descripcion?: string; // máx. 72 caracteres
+}
+
+export interface SeccionLista {
+  titulo: string; // máx. 24 caracteres
+  filas: FilaLista[];
+}
+
+export interface EnviarListaParams {
+  phoneNumberId: string;
+  token: string;
+  para: string;
+  cuerpo: string; // máx. 4096 caracteres
+  textoBoton: string; // máx. 20 caracteres
+  secciones: SeccionLista[]; // máx. 10 filas en TOTAL sumando todas las secciones
+  pie?: string; // máx. 60 caracteres
+}
+
+/** Mensaje de servicio con lista interactiva (selector nativo de WhatsApp) — mismo requisito de ventana de 24h que enviarMensajeWhatsApp, no es un mensaje de plantilla. */
+export async function enviarListaWhatsApp(
+  params: EnviarListaParams,
+  fetchImpl: typeof fetch = fetch
+): Promise<void> {
+  await llamarApiMensajes(
+    params.phoneNumberId,
+    params.token,
+    {
+      messaging_product: "whatsapp",
+      to: params.para,
+      type: "interactive",
+      interactive: {
+        type: "list",
+        body: { text: params.cuerpo },
+        ...(params.pie ? { footer: { text: params.pie } } : {}),
+        action: {
+          button: params.textoBoton,
+          sections: params.secciones.map((seccion) => ({
+            title: seccion.titulo,
+            rows: seccion.filas.map((fila) => ({
+              id: fila.id,
+              title: fila.titulo,
+              ...(fila.descripcion ? { description: fila.descripcion } : {}),
+            })),
+          })),
+        },
+      },
+    },
+    fetchImpl
+  );
+}

@@ -3,10 +3,12 @@ import { obtenerSlotsDisponibles } from "./lib/disponibilidad.ts";
 import { interpretarSolicitud } from "./lib/nlu.ts";
 import { moduloAgendamiento } from "./lib/modulos/agendamiento.ts";
 import { utcToZoned, diaSemanaDeFecha, nombreDiaSemana } from "./lib/tz.ts";
-import { parsearMensajeWhatsApp, parsearBotonWhatsApp } from "./lib/webhook.ts";
+import { parsearMensajeWhatsApp, parsearBotonWhatsApp, parsearListaWhatsApp, type MensajeEntrante } from "./lib/webhook.ts";
 import { procesarMensajeEntrante } from "./lib/flujo.ts";
 import { procesarRecordatorios } from "./lib/recordatorios.ts";
 import { procesarBotonEntrante } from "./lib/confirmacionCita.ts";
+import { procesarListaEntrante } from "./lib/listaMenu.ts";
+import { enviarListaWhatsApp } from "./lib/whatsapp.ts";
 
 export interface Env {
   DB: D1Database;
@@ -114,6 +116,7 @@ export default {
       const body = await request.json().catch(() => null);
       const mensaje = body ? parsearMensajeWhatsApp(body) : null;
       const boton = !mensaje && body ? parsearBotonWhatsApp(body) : null;
+      const lista = !mensaje && !boton && body ? parsearListaWhatsApp(body) : null;
 
       if (boton) {
         // Respuesta a "Confirmar"/"Cancelar" del recordatorio: se resuelve
@@ -123,6 +126,54 @@ export default {
           await procesarBotonEntrante({ db: env.DB, whatsappToken: env.WHATSAPP_TOKEN, boton });
         } catch (error) {
           console.error(`Error procesando botón de ${boton.clienteTelefono}:`, error);
+        }
+        return new Response("OK", { status: 200 });
+      }
+
+      if (lista) {
+        // Fila elegida de la lista del menú (ver_menu). Una categoría se
+        // resuelve acá mismo (manda la lista de ítems de esa categoría); un
+        // ítem final se reenvía como si el cliente lo hubiera escrito, para
+        // seguir el mismo camino de siempre de hacer_pedido (Claude pide
+        // cantidad, tipo de entrega, confirmación).
+        try {
+          const negocio = await env.DB.prepare(
+            "SELECT id FROM negocios WHERE whatsapp_phone_number_id = ? AND activo = 1"
+          )
+            .bind(lista.phoneNumberId)
+            .first<{ id: number }>();
+
+          if (negocio) {
+            const resultado = await procesarListaEntrante({
+              db: env.DB,
+              negocioId: negocio.id,
+              idFila: lista.id,
+              enviarLista: (parametros) =>
+                enviarListaWhatsApp({
+                  phoneNumberId: lista.phoneNumberId,
+                  token: env.WHATSAPP_TOKEN,
+                  para: lista.clienteTelefono,
+                  ...parametros,
+                }),
+            });
+
+            if (!resultado.manejado && resultado.nombreItemSeleccionado) {
+              const mensajeSintetico: MensajeEntrante = {
+                phoneNumberId: lista.phoneNumberId,
+                clienteTelefono: lista.clienteTelefono,
+                clienteNombrePerfil: null,
+                texto: `Quiero ${resultado.nombreItemSeleccionado}`,
+              };
+              await procesarMensajeEntrante({
+                db: env.DB,
+                claude: new Anthropic({ apiKey: env.ANTHROPIC_API_KEY }),
+                whatsappToken: env.WHATSAPP_TOKEN,
+                mensaje: mensajeSintetico,
+              });
+            }
+          }
+        } catch (error) {
+          console.error(`Error procesando lista de ${lista.clienteTelefono}:`, error);
         }
         return new Response("OK", { status: 200 });
       }

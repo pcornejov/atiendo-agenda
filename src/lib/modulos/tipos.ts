@@ -5,6 +5,7 @@
 
 import type { ClienteClaude, SolicitudInterpretada, DescripcionIntent } from "../nlu.ts";
 import type { MensajeEntrante } from "../webhook.ts";
+import type { EnviarListaParams } from "../whatsapp.ts";
 
 export interface NegocioRow {
   id: number;
@@ -22,6 +23,8 @@ export interface ContextoModulo {
   mensaje: MensajeEntrante;
   ahoraUtc: Date;
   enviar: (texto: string) => Promise<void>;
+  /** Mensaje de lista interactiva de WhatsApp (selector nativo) — ver listaMenu.ts. */
+  enviarLista: (params: Omit<EnviarListaParams, "phoneNumberId" | "token" | "para">) => Promise<void>;
 }
 
 export interface DefinicionModulo {

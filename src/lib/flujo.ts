@@ -7,7 +7,7 @@
 
 import { interpretarSolicitud, type ClienteClaude } from "./nlu.ts";
 import { obtenerEstadoVigente, limpiarEstado } from "./conversacion.ts";
-import { enviarMensajeWhatsApp } from "./whatsapp.ts";
+import { enviarMensajeWhatsApp, enviarListaWhatsApp, type EnviarListaParams } from "./whatsapp.ts";
 import { utcToZoned, diaSemanaDeFecha, nombreDiaSemana } from "./tz.ts";
 import { formatearFallback } from "./mensajes.ts";
 import { moduloAgendamiento } from "./modulos/agendamiento.ts";
@@ -60,6 +60,13 @@ export async function procesarMensajeEntrante(params: {
       para: mensaje.clienteTelefono,
       texto,
     });
+  const enviarLista = (params: Omit<EnviarListaParams, "phoneNumberId" | "token" | "para">) =>
+    enviarListaWhatsApp({
+      phoneNumberId: negocio.whatsapp_phone_number_id,
+      token: whatsappToken,
+      para: mensaje.clienteTelefono,
+      ...params,
+    });
 
   const modulos = await obtenerModulosActivos(db, negocio.id);
   if (modulos.length === 0) {
@@ -70,7 +77,7 @@ export async function procesarMensajeEntrante(params: {
     return;
   }
 
-  const ctx: ContextoModulo = { db, claude, negocio, mensaje, ahoraUtc, enviar };
+  const ctx: ContextoModulo = { db, claude, negocio, mensaje, ahoraUtc, enviar, enviarLista };
 
   const estadoVigente = await obtenerEstadoVigente(db, negocio.id, mensaje.clienteTelefono, ahoraUtc);
   if (estadoVigente) {

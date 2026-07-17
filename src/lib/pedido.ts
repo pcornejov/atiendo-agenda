@@ -6,12 +6,13 @@ export interface MenuItem {
   nombre: string;
   descripcion: string | null;
   precio_clp: number;
+  categoria: string | null;
 }
 
 export async function listarMenuDisponible(db: D1Database, negocioId: number): Promise<MenuItem[]> {
   const resultado = await db
     .prepare(
-      "SELECT id, nombre, descripcion, precio_clp FROM menu_items WHERE negocio_id = ? AND disponible = 1 ORDER BY orden, nombre"
+      "SELECT id, nombre, descripcion, precio_clp, categoria FROM menu_items WHERE negocio_id = ? AND disponible = 1 ORDER BY orden, nombre"
     )
     .bind(negocioId)
     .all<MenuItem>();

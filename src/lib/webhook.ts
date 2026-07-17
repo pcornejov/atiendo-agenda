@@ -97,3 +97,51 @@ export function parsearBotonWhatsApp(body: unknown): BotonEntrante | null {
 
   return null;
 }
+
+export interface ListaEntrante {
+  phoneNumberId: string; // identifica al negocio (negocios.whatsapp_phone_number_id)
+  clienteTelefono: string; // E.164 con '+'
+  id: string; // el id que le asignamos a la fila al armar la lista (ver listaMenu.ts)
+  titulo: string; // el texto visible de la fila que tocó
+}
+
+/**
+ * Fila elegida de un mensaje de lista interactiva (ver_menu, ver
+ * listaMenu.ts) — WhatsApp la manda como `type: "interactive"` con
+ * `interactive.type: "list_reply"`, distinto del `type: "button"` de un
+ * botón de plantilla.
+ */
+export function parsearListaWhatsApp(body: unknown): ListaEntrante | null {
+  if (typeof body !== "object" || body === null) return null;
+  const entradas = (body as Record<string, unknown>).entry;
+  if (!Array.isArray(entradas)) return null;
+
+  for (const entrada of entradas) {
+    const cambios = entrada?.changes;
+    if (!Array.isArray(cambios)) continue;
+
+    for (const cambio of cambios) {
+      const valor = cambio?.value;
+      const mensajes = valor?.messages;
+      if (!Array.isArray(mensajes) || mensajes.length === 0) continue;
+
+      const mensaje = mensajes[0];
+      if (mensaje?.type !== "interactive" || mensaje?.interactive?.type !== "list_reply") continue;
+      const listReply = mensaje.interactive.list_reply;
+      if (typeof listReply?.id !== "string") continue;
+
+      const phoneNumberId = valor?.metadata?.phone_number_id;
+      const from = mensaje?.from;
+      if (typeof phoneNumberId !== "string" || typeof from !== "string") continue;
+
+      return {
+        phoneNumberId,
+        clienteTelefono: normalizarTelefono(from),
+        id: listReply.id,
+        titulo: typeof listReply.title === "string" ? listReply.title : "",
+      };
+    }
+  }
+
+  return null;
+}

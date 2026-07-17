@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { enviarMensajeWhatsApp, enviarPlantillaWhatsApp } from "./whatsapp.ts";
+import { enviarMensajeWhatsApp, enviarPlantillaWhatsApp, enviarListaWhatsApp } from "./whatsapp.ts";
 
 test("enviarMensajeWhatsApp arma la URL, headers y body correctos", async () => {
   const llamadas: Array<{ url: string; init: RequestInit }> = [];
@@ -166,4 +166,79 @@ test("enviarPlantillaWhatsApp con botones pero sin parámetros de body igual arm
   assert.deepEqual(body.template.components, [
     { type: "button", sub_type: "quick_reply", index: "0", parameters: [{ type: "payload", payload: "confirmar_cita_9" }] },
   ]);
+});
+
+test("enviarListaWhatsApp arma el body de tipo interactive/list con secciones y filas", async () => {
+  const llamadas: Array<{ url: string; init: RequestInit }> = [];
+  const fetchFalso: typeof fetch = async (url, init) => {
+    llamadas.push({ url: url.toString(), init: init ?? {} });
+    return new Response("{}", { status: 200 });
+  };
+
+  await enviarListaWhatsApp(
+    {
+      phoneNumberId: "123456789012345",
+      token: "tok-abc",
+      para: "+56912345678",
+      cuerpo: "Este es nuestro menú, elige una categoría:",
+      textoBoton: "Ver menú",
+      secciones: [
+        {
+          titulo: "Categorías",
+          filas: [
+            { id: "cat:Hamburguesas", titulo: "Hamburguesas", descripcion: "4 opciones" },
+            { id: "cat:Bebidas", titulo: "Bebidas", descripcion: "3 opciones" },
+          ],
+        },
+      ],
+    },
+    fetchFalso
+  );
+
+  assert.equal(llamadas[0].url, "https://graph.facebook.com/v21.0/123456789012345/messages");
+  assert.deepEqual(JSON.parse(llamadas[0].init.body as string), {
+    messaging_product: "whatsapp",
+    to: "+56912345678",
+    type: "interactive",
+    interactive: {
+      type: "list",
+      body: { text: "Este es nuestro menú, elige una categoría:" },
+      action: {
+        button: "Ver menú",
+        sections: [
+          {
+            title: "Categorías",
+            rows: [
+              { id: "cat:Hamburguesas", title: "Hamburguesas", description: "4 opciones" },
+              { id: "cat:Bebidas", title: "Bebidas", description: "3 opciones" },
+            ],
+          },
+        ],
+      },
+    },
+  });
+});
+
+test("enviarListaWhatsApp agrega el footer solo si se pasa 'pie', y omite 'description' si una fila no la trae", async () => {
+  const llamadas: Array<{ init: RequestInit }> = [];
+  const fetchFalso: typeof fetch = async (_url, init) => {
+    llamadas.push({ init: init ?? {} });
+    return new Response("{}", { status: 200 });
+  };
+
+  await enviarListaWhatsApp(
+    {
+      phoneNumberId: "1",
+      token: "tok",
+      para: "+56900000000",
+      cuerpo: "Elige un producto:",
+      textoBoton: "Ver opciones",
+      secciones: [{ titulo: "Menú", filas: [{ id: "item:1", titulo: "Bebida" }] }],
+    },
+    fetchFalso
+  );
+
+  const body = JSON.parse(llamadas[0].init.body as string);
+  assert.equal("footer" in body.interactive, false);
+  assert.deepEqual(body.interactive.action.sections[0].rows[0], { id: "item:1", title: "Bebida" });
 });

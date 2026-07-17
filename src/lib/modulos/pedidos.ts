@@ -12,6 +12,7 @@ import {
 } from "../nlu.ts";
 import { guardarEstado, limpiarEstado } from "../conversacion.ts";
 import { listarMenuDisponible, crearPedido, buscarPedidoActivo, cancelarPedidoActivo } from "../pedido.ts";
+import { armarListaMenu } from "../listaMenu.ts";
 import {
   formatearMenu,
   formatearSinMenu,
@@ -51,13 +52,20 @@ interface ContextoPedidoPendiente extends ContextoItemsPendientes {
 }
 
 async function manejarIntent(solicitud: SolicitudInterpretada, ctx: ContextoModulo): Promise<boolean> {
-  const { db, claude, negocio, mensaje, ahoraUtc, enviar } = ctx;
+  const { db, claude, negocio, mensaje, ahoraUtc, enviar, enviarLista } = ctx;
 
   if (solicitud.intent === "ver_menu") {
     const menu = await listarMenuDisponible(db, negocio.id);
     if (menu.length === 0) {
       await enviar(formatearSinMenu());
+      return true;
+    }
+    const lista = armarListaMenu(menu);
+    if (lista) {
+      await enviarLista(lista);
     } else {
+      // Demasiados ítems sin categorizar para entrar en una lista (más de
+      // 10, ver listaMenu.ts) — cae al texto plano de siempre.
       await enviar(formatearMenu(menu));
     }
     return true;
